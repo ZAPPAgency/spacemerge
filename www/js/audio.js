@@ -95,9 +95,7 @@ function sweep(freqFrom, freqTo, dur, type, vol) {
   osc.start(); osc.stop(ctx.currentTime + dur);
 }
 
-// Short burst of filtered white noise - the raw material for anything that
-// needs to sound physical/textured rather than tonal (impacts, explosions,
-// rocky crackle), which pure oscillators (beep/sweep) can't produce.
+// Filtered white noise: textured sounds (impacts, crackle) that oscillators can't make.
 function noiseBurst(dur, filterType, freqFrom, freqTo, vol) {
   if (!Game.settings.sound) return;
   const ctx = ensureAudio();
@@ -119,9 +117,7 @@ function noiseBurst(dur, filterType, freqFrom, freqTo, vol) {
   noise.start(); noise.stop(ctx.currentTime + dur);
 }
 
-// Ascending run used for the merge-streak reward chime in Sfx.meteorImpact -
-// a pleasant major-key climb (no dissonant steps) so it stays satisfying
-// even at the top of a long combo instead of turning shrill/random.
+// Combo chime notes (Hz), one step per merge streak. Major scale so long combos stay pleasant.
 const COMBO_NOTES = [523.25, 587.33, 659.25, 739.99, 830.61, 932.33, 1046.5, 1174.66];
 
 const Sfx = {
@@ -129,46 +125,24 @@ const Sfx = {
   // A quick rising whoosh (two tiles converging) followed by a bright two-note
   // chime (the pop of becoming one) - deliberately distinct from tap/click,
   // and scales up a little with tier so late-game fusions feel more powerful.
-  // No longer wired to the default merge (see meteorImpact below), kept
-  // around as a candidate for a future "classic"/alternate merge-style
-  // option once several visual effects can be picked between.
+  // Unused: merges play meteorImpact. Kept for an alternate merge style.
   merge(newTier) {
     const base = 220 + newTier * 18;
     sweep(base * 0.55, base * 1.7, 0.15, "sine", 0.085);
     setTimeout(() => chime([base * 1.7, base * 2.5], 55, "triangle", 0.08), 140);
   },
-  // Merge impact sound (paired with playMeteorMerge() in ui.js): a very
-  // short whoosh-in, then a punchy pitched "pop" + a brief crack of rocky
-  // texture on landing, then a bright rising note. Kept SHORT and snappy on
-  // purpose - this fires on every merge, often several per second, so it
-  // has to feel like an instant reaction to the tap, never a delay. The
-  // 110ms wait before the pop MUST stay in sync with METEOR_FALL_MS in
-  // ui.js and the meteorFall CSS animation in style.css.
-  //
-  // `streak` (0+, see MERGE_STREAK_WINDOW_MS in input.js) walks the reward
-  // note up COMBO_NOTES each time merges land back to back, the same trick
-  // Candy Crush/Two Dots-style combo chimes use - chaining merges quickly
-  // is what should feel the most addictive, so it's the one thing that
-  // audibly escalates instead of repeating identically every time.
+  // Merge sound, paired with playMeteorMerge() in ui.js: whoosh, then pop + crackle,
+  // then a combo note. Short because it can fire several times per second.
+  // The 110 ms delay must match METEOR_FALL_MS in ui.js.
+  // `streak` (see MERGE_STREAK_WINDOW_MS in input.js) raises the combo note.
   meteorImpact(newTier, streak) {
-    // Loris (challenging the previous version, correctly): the overall
-    // punch/volume was scaling with STREAK (merge speed), but the VISUAL
-    // effect (playMeteorMerge, ui.js) already scales with TIER per Noah's
-    // original note ("de plus en plus fort en fonction du niveau de merge,
-    // pas de la vitesse") - so sound and visual were escalating on two
-    // different axes, which could mismatch (a huge tier-8 merge landing
-    // with a quiet sound because it happened slowly, or a tiny tier-1
-    // merge sounding huge because it was hit #5 in a fast chain). `boost`
-    // is now tier-led, with streak kept as a much smaller accent rather
-    // than the main driver. The COMBO_NOTES reward-chime melody itself
-    // still climbs with streak, untouched - Loris specifically liked that
-    // part and it's a separate concern from overall loudness/punch.
+    // Loudness follows tier, like the visual effect; streak only adds a small accent.
     const t = Math.min(newTier, 10);
     const s = Math.min(streak || 0, 6);
-    const boost = 1 + (t - 1) * 0.19 + s * 0.05; // tier1/streak0 ~1x, tier10/streak6 ~2.75x
+    const boost = 1 + (t - 1) * 0.19 + s * 0.05; // ~1x at tier 1, ~2.75x at tier 10 + streak 6
     noiseBurst(0.05, "bandpass", 2800, 1000, Math.min(0.045 * boost, 0.11));
     setTimeout(() => {
-      const swing = 1 + (t - 1) * 0.07 + s * 0.03; // pitch swing now widens mainly with tier
+      const swing = 1 + (t - 1) * 0.07 + s * 0.03;
       sweep(520 + t * 9, (200 + t * 6) / swing, 0.09, "triangle", Math.min(0.12 * boost, 0.28));
       noiseBurst(0.07, "lowpass", 1800, 280, Math.min(0.07 * boost, 0.17));
       noiseBurst(0.05, "highpass", 2200 * swing, 3200 * swing, Math.min(0.02 * boost, 0.05));
@@ -183,17 +157,9 @@ const Sfx = {
   purchase() { chime([520, 780, 1040], 70, "sine", 0.06); },
   bigBang() { chime([80, 160, 320, 640, 960], 90, "sawtooth", 0.09); },
   chest() { chime([440, 660, 880], 90, "triangle", 0.07); },
-  // One "tick" of the prize wheel passing a peg - short and clicky (square
-  // wave reads as mechanical rather than musical), slight pitch jitter so a
-  // long run of them doesn't sound like a machine-gun. See scheduleWheelTicks
-  // in input.js, which calls this repeatedly at a decelerating rate for the
-  // whole spin - previously the wheel spun in total silence.
+  // Wheel peg tick, called by scheduleWheelTicks (input.js). Pitch jitter avoids a machine-gun effect.
   wheelTick() { beep(880 + Math.random() * 220, 0.035, "square", 0.045); },
-  // A proper little win fanfare for landing on a wheel prize (Loris found
-  // reusing Sfx.chest() - the same sound as the daily-login chest - too
-  // easy to miss/not register as "the wheel specifically paid out"). A
-  // brighter, longer ascending run than chest()'s plain 3-note triad, with
-  // a quick high sparkle flourish tacked on at the end.
+  // Distinct from chest() so a wheel win is clearly noticed.
   wheelWin() {
     chime([523.25, 659.25, 783.99, 1046.5], 65, "triangle", 0.075);
     setTimeout(() => chime([1318.5, 1568], 45, "sine", 0.05), 260);

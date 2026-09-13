@@ -1,34 +1,14 @@
 // Godspark - prestige (Big Bang), permanent skill tree, shop logic
 "use strict";
 
-// Was `t.tier === TIERS.length` - broke the moment TIERS grew past Univers
-// (tier 10, UNIVERSE_TIER in config.js): merging two Univers tiles into a
-// Multivers removes every tier-10 tile from the grid, which would silently
-// revoke Big Bang eligibility a player had already earned. UNIVERSE_TIER is
-// a fixed reference instead of "whatever the current ceiling is" - reaching
-// Univers or anything higher keeps Big Bang available for the rest of the
-// run, however far past it the player pushes.
-//
-// Compared against tileProgressTier() (config.js), not the raw t.tier: the
-// infinite loop added by performMerge() below sends a tile's tier back to 1
-// while bumping `cycle`, so a player whose only high tiles were two Genèse
-// (tier 14) saw the Big Bang button vanish the moment they merged them - the
-// exact already-earned-eligibility revocation described above, reappearing
-// at the loop boundary.
+// Uses a fixed tier (not the top tier) so merging past Univers keeps Big Bang available.
+// tileProgressTier() counts looped tiles, whose raw `tier` goes back to 1.
 function hasUniverseTile(state) {
   return state.grid.some(t => t && tileProgressTier(t) >= UNIVERSE_TIER);
 }
-// "Surcharge du Big Bang" run upgrade (RUN_UPGRADE_TREE, config.js) applies
-// here rather than inside the pure bigBangGain() formula (config.js) so
-// that stays a plain function of (stardust, tier) with no state coupling -
-// this is also what performBigBang() below actually calls to grant the
-// real gain, so the number shown in the pre-Big-Bang preview (Loris:
-// openBigBangModal, ui.js) is always exactly what gets paid out.
+// The run upgrade applies here, not in the pure bigBangGain(), so the preview
+// equals what performBigBang() pays.
 function previewBigBangGain(state) {
-  // Was state.maxTierThisRun (a single number) - bigBangGain() now sums a
-  // weight per actual tier-10+ tile on the grid (Loris: "ça augmentera
-  // selon le nombre de cases de niveau 10 et plus"), so it needs the real
-  // grid, not just the highest tier ever reached this run.
   const base = bigBangGain(state.runStardustEarned, state.grid);
   const surgeMult = 1 + (state.runUpgrades.surge || 0) * 0.05;
   return Math.round(base * surgeMult);
@@ -36,12 +16,8 @@ function previewBigBangGain(state) {
 
 function performBigBang(state) {
   checkThanatosChallenge(state); // must run before the grid resets - it checks the current grid's fill state
-  // Easter egg "Les Extrêmes" (Loris) - every filled cell is tier 1 or
-  // UNIVERSE_TIER, nothing in between. Must read the grid before freshGrid()
-  // replaces it below. Compared on tileProgressTier() for the same reason
-  // hasUniverseTile() above is: a looped tile reads as `tier: 1` while really
-  // sitting above Genèse, so on raw tier it would pass as a "commencement"
-  // and hand out the egg for a grid that is not extremes-only at all.
+  // Easter egg "Les Extrêmes": every filled cell is tier 1 or UNIVERSE_TIER.
+  // Must read the grid before it resets below.
   const pureExtremes = state.grid.every(t => !t || tileProgressTier(t) === 1 || tileProgressTier(t) === UNIVERSE_TIER);
   const eggResult = pureExtremes ? unlockEasterEgg(state, "pure_extremes") : null;
   const minEnergy = getGodEffects(state).bigBangMinEnergy || 0;
@@ -66,9 +42,7 @@ function performBigBang(state) {
   state.manualSpawnCount = 0;
   state.extraUnlockedCount = 0;
   state.runStartedAt = Date.now();
-  // Run upgrades (RUN_UPGRADE_TREE) are scoped to the grid that just ended -
-  // reset alongside every other per-run field above, same lifecycle as
-  // moonMergesThisRun/usedShortcutThisRun.
+  // Run upgrades only last one run.
   for (const key in state.runUpgrades) state.runUpgrades[key] = 0;
 
   checkAchievements(state);
@@ -106,28 +80,21 @@ function buySkill(state, key) {
   return { ok: true, cost, newLevel: state.skills[key] };
 }
 
-// Run-scoped upgrade tree (RUN_UPGRADE_TREE, config.js), Stardust-priced,
-// mirrors buySkill() above but spends state.stardust instead of
-// state.cosmicEnergy and resets to 0 on every Big Bang/restart (see the
-// resets in performBigBang/restartRun above).
+// Run upgrades: like buySkill() but paid in Stardust and reset every run.
 function buyRunUpgrade(state, key) {
   const branch = RUN_UPGRADE_TREE[key];
   const level = state.runUpgrades[key];
   if (level >= branch.maxLevel) return { ok: false, reason: "max" };
   const cost = runUpgradeCost(key, level + 1);
   if (state.stardust < cost) return { ok: false, reason: "funds", cost };
-  spendStardust(state, cost); // not a bare `-=`: spendStardust also feeds the "Dépense N Stardust" daily quests
+  spendStardust(state, cost); // also advances spending quests
   state.runUpgrades[key] += 1;
   return { ok: true, cost, newLevel: state.runUpgrades[key] };
 }
 
-// "Résonance" run upgrade: each level adds a flat chance that unlocking a
-// cell (by tap, ad, or Gems shortcut) resonates and frees one extra random
-// locked cell for free. Called from the 3 real unlock paths in input.js
-// (tryUnlock, onUnlockCellAd, the skipCell gem-shop purchase) - NOT from the
-// starter-pack bulk 3-cell grant, which is a store-bought convenience, not
-// gameplay progress. Returns the bonus cell's index, or null if it didn't
-// trigger / there was nothing left to unlock.
+// "Résonance": chance that an unlock frees one extra random locked cell.
+// Called from the 3 gameplay unlock paths (input.js), not the starter pack.
+// Returns the bonus cell index, or null.
 function maybeTriggerResonance(state) {
   const level = state.runUpgrades.resonance || 0;
   if (level <= 0) return null;
@@ -144,11 +111,7 @@ function maybeTriggerResonance(state) {
 function buyGemShopItem(state, itemId, opts) {
   const item = SHOP_GEM_ITEMS.find(i => i.id === itemId);
   if (!item) return { ok: false, reason: "unknown" };
-  // Loris: offer a rewarded ad instead of a dead-end "Pas assez de Gems."
-  // when clicking Échanger without enough Gems (onSwapCellsClick, input.js)
-  // - opts.free skips the cost check/deduction entirely for that one swap,
-  // everything else (target validation, usedShortcutThisRun) stays identical
-  // to a normal paid swap.
+  // opts.free: swap paid with a rewarded ad, no Gems cost.
   const free = opts && opts.free;
   if (!free && state.gems < item.cost) return { ok: false, reason: "funds", cost: item.cost };
 
@@ -186,18 +149,8 @@ function buyGemShopItem(state, itemId, opts) {
 }
 
 // Single pair merge used by tap/drag input.
-// Loris: "a partir du niveau 14, si on fusionne deux cases de niveau 14
-// elles redeviennent des cases de niveau 1 [...] on pourrait reproduire
-// cela à l'infini avec des couleurs différentes" - merging two tiles at
-// the true top tier (TIERS.length) used to just be refused; now it loops
-// back to tier 1 with `cycle` (a fresh field on the tile, defaults to 0/
-// unset for every tile from before this feature - see `|| 0` below) bumped
-// by one instead. Two tiles can only merge if both their tier AND their
-// cycle match - merging across cycles isn't meaningful (what color would
-// the result even be?). maxTierThisRun/maxTierEver (below) stay correct
-// with no special-casing: Math.max against a fresh tier-1 tile never
-// lowers them, so they keep reflecting the true historical peak (still
-// capped at TIERS.length) even as individual tiles keep looping.
+// Two tiles merge only if tier AND cycle match. Merging two top-tier tiles loops
+// back to tier 1 with `cycle` + 1. Older tiles have no `cycle`, hence `|| 0`.
 function performMerge(state, fromIdx, toIdx) {
   const a = state.grid[fromIdx], b = state.grid[toIdx];
   if (!a || !b || a.tier !== b.tier || (a.cycle || 0) !== (b.cycle || 0)) return null;
@@ -216,23 +169,13 @@ function performMerge(state, fromIdx, toIdx) {
     gemBonus = grantGems(state, 1);
   }
 
-  // Easter egg "Le Second Souffle" (Loris: "atteindre le tier 2 (deux case
-  // de niveau 14 du tier de base qui fusionne)" - his own "tier" here means
-  // this loop counter, `cycle`, not TIERS 1-14) - reaching a second loop
-  // for the first time. Loris counts loops from 1 ("tier de base" = his
-  // tier 1 = cycle 0), so his "tier 2" is exactly what merging two base
-  // Genèse produces: cycle 1. `>= 2` was off by one, and cycle 2 needs two
-  // cycle-1 Genèse, ~2^28 meteorites in a single run on a 30-cell grid -
-  // which made this egg, and the 4-egg challenge behind it, unreachable.
+  // Easter egg "Le Second Souffle": first looped tile (cycle 1).
   const eggResult = newCycle >= 1 ? unlockEasterEgg(state, "second_loop") : null;
 
   trackFusionEvent(state, newTier);
   return { newTier, newCycle, looped, gemBonus, eggResult };
 }
 
-// Was shared between two cosmetic slots (ambiance/background + emoji-set),
-// now just emoji-set - the ambiance color skins were removed entirely per
-// Loris' request, EMOJI_SETS (Fruits/Légumes) stays.
 function findCosmeticItem(id) {
   return EMOJI_SETS.find(e => e.id === id) || null;
 }
@@ -251,22 +194,9 @@ function equipCosmetic(state, id) {
   return true;
 }
 
-// "Clicker automatique" (Loris) - replaces the old Boost x2. Targets a
-// specific grid cell instead of a flat production multiplier; the actual
-// per-frame auto-tap loop is tickAutoClicker() (input.js), this just starts
-// the window. Setting freeUsedDate here (not only at the free-activation
-// call site) means both the free and the ad-gated reactivation path can
-// call this one function - by the time either reaches here, today's free
-// use is spent either way.
-//
-// `opts.keepFreeDaily` opts out of that, for the one caller where the
-// assumption doesn't hold: the paid starter pack (onBuyIAP, input.js), which
-// grants a clicker window as part of the purchase. Consuming the day's free
-// activation there meant a player who bought the pack before using it lost
-// it outright - once the paid hour expired they were told to watch an ad for
-// a free daily use they had never had.
-// `opts.durationMs` likewise lets that purchase grant its own longer window
-// instead of overwriting activeUntil right after this call.
+// Starts an auto-clicker window; tickAutoClicker() (input.js) does the tapping.
+// Consumes today's free use unless `opts.keepFreeDaily` (paid starter pack).
+// `opts.durationMs` overrides AUTO_CLICKER_DURATION_MS.
 function activateAutoClicker(state, targetIdx, opts) {
   const durationMs = (opts && opts.durationMs) || AUTO_CLICKER_DURATION_MS;
   state.autoClicker.targetIdx = targetIdx;
@@ -277,9 +207,7 @@ function isAutoClickerFreeAvailable(state) {
   return state.autoClicker.freeUsedDate !== todayStr();
 }
 
-// Gems source, home-screen "+20 Gems" fab. Loris: "le bouton +20 gemmes une
-// fois par jour il devrait être gratuit aussi (reset à minuit)" - the day's
-// very first claim, no ad at all (onWatchGemsAd, input.js).
+// First "+20 Gems" claim of the day, no ad needed.
 function grantGemsFree(state) {
   state.gemsAdFree.date = todayStr();
   state.gemsAdFree.used = true;
@@ -288,12 +216,7 @@ function grantGemsFree(state) {
 function isGemsAdFreeAvailable(state) {
   return state.gemsAdFree.date !== todayStr() || !state.gemsAdFree.used;
 }
-// Beyond that free daily claim: Loris explicitly asked to keep the original
-// "up to GEMS_AD_STREAK_SIZE ad watches in a row, then a cooldown" streak
-// system rather than drop it, only with the free claim added in front of it
-// and the cooldown lengthened (3 min -> GEMS_AD_COOLDOWN_MS, now 5 min).
-// The streak's own count resets at midnight (ensureGemsAdStreak,
-// retention.js) independently of the cooldown itself.
+// After the free claim: GEMS_AD_STREAK_SIZE ads in a row, then a GEMS_AD_COOLDOWN_MS pause.
 function grantGemsFromAd(state) {
   ensureGemsAdStreak(state);
   const granted = grantGems(state, GEMS_AD_REWARD);

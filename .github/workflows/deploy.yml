@@ -9,10 +9,8 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Groupe propre au déploiement de main. Volontairement PAS partagé avec les
-# workflows de preview : un seul run peut être en attente par groupe, donc un
-# groupe commun fait s'annuler les previews entre elles. Les conflits de push
-# sur gh-pages sont gérés par le retry intégré à l'action.
+# Not shared with the preview workflows: a group keeps only one pending run, so a
+# shared group cancels runs. gh-pages push conflicts are retried by the action.
 concurrency:
   group: gh-pages-main
   cancel-in-progress: false

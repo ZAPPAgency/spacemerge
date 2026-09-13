@@ -2,10 +2,7 @@
 //
 // This file is the ONLY module-type script in index.html; every other game
 // file stays plain <script> (global functions, zero build step) so the web
-// build keeps working unmodified in any browser. Every actual EFFECT below
-// is a no-op when Capacitor isn't present (window.Capacitor undefined) - see
-// the guard a few lines down for the one console error this does still cost
-// in that case.
+// build keeps working unmodified in any browser. Without Capacitor, nothing below runs.
 //
 // It replaces the web stubs (services.js: AdService/IAPService, audio.js:
 // HapticService, state.js: saveState/loadState) with real native-backed
@@ -27,13 +24,8 @@ import { Purchases, LOG_LEVEL } from "@revenuecat/purchases-capacitor";
 import { GameConnect } from "@openforge/capacitor-game-connect";
 
 if (!Capacitor || !Capacitor.isNativePlatform || !Capacitor.isNativePlatform()) {
-  // Running in a plain browser (GitHub Pages / local testing) - do nothing.
-  // Note: the static imports above still get requested by the browser even
-  // here, and fail to resolve (bare package specifiers like "@capacitor/core"
-  // only resolve once this file passes through the Capacitor/Vite native
-  // build - see docs/BUILD_IOS.md) - one expected, harmless console error
-  // per page load in every non-native context. Nothing downstream of it
-  // depends on this module actually loading outside of a native build.
+  // Plain browser. The bare imports above only resolve in the Vite build, so the web
+  // build logs one expected, harmless console error here.
 } else {
   bootNative();
 }

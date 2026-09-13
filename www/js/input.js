@@ -26,28 +26,14 @@ function createGhost(tier, x, y) {
 let pointerState = null;
 let pointerWatchdog = null;
 
-// Bug report (Loris' friend, screenshot): tapping very fast repeatedly left
-// one cell permanently stuck - invisible/unresponsive, "je n'arrive pas à
-// utiliser la case". Root cause: this listens to BOTH "pointerdown" AND
-// "touchstart" (see wireEvents below) so a single physical touch on a
-// touchscreen fires onPointerDown TWICE. Previously the 2nd call silently
-// overwrote the module-scope `pointerState` with a fresh session - if the
-// 1st call had already started a drag (ghost tile appended to <body>, the
-// tile given the .dragging class which sets opacity:0), that ghost/class
-// were orphaned forever: nothing held a reference to them any more, so
-// onPointerUp's cleanup could never reach them, and the real tile stayed
-// invisible under the leftover ghost until a full page reload. The same
-// leak could also happen from any dropped up/cancel event (more likely
-// inside an in-app browser like WhatsApp's, which is where the repro
-// screenshot was taken).
-// Fixed with: (1) ignoring a new pointerdown while a session is already in
-// flight instead of clobbering it, (2) handling pointercancel/touchcancel
-// so an interrupted gesture still cleans up, (3) a watchdog timeout as a
-// last-resort safety net in case a webview drops both the up and cancel
-// events outright.
+// A touch fires both pointerdown and touchstart, and webviews can drop up/cancel events.
+// Without these guards a tile could stay stuck invisible under an orphaned drag ghost:
+// - ignore a new pointerdown while a gesture is tracked
+// - clean up on pointercancel/touchcancel
+// - a watchdog timeout cancels a gesture that never ends
 function onPointerDown(e) {
   if (!dom.panelOverlay.classList.contains("hidden") || !dom.drawerOverlay.classList.contains("hidden")) return;
-  if (pointerState) return; // a gesture is already being tracked - see note above
+  if (pointerState) return; // gesture already tracked, see note above
   const pos = localPos(e);
   const idx = cellIdxAtPoint(pos.x, pos.y);
   if (idx === null) return;
@@ -81,10 +67,7 @@ function endPointerListeners() {
   clearTimeout(pointerWatchdog);
 }
 
-// Gesture interrupted with no proper up event (OS takes over for a system
-// gesture, multi-touch confuses the browser, app loses focus mid-touch, or
-// - the watchdog case - the up/cancel event never arrives at all). Cleans up
-// exactly like onPointerUp's non-merge branch, without attempting a merge.
+// Gesture interrupted (system gesture, focus loss, watchdog). Cleans up without merging.
 function onPointerCancel() {
   if (!pointerState) return;
   const { idx, ghostEl } = pointerState;
@@ -99,7 +82,7 @@ function onPointerMove(e) {
   const pos = localPos(e);
   const dx = pos.x - pointerState.startX, dy = pos.y - pointerState.startY;
   if (!pointerState.dragging && Math.hypot(dx, dy) > DRAG_THRESHOLD) {
-    if (Game.swapArmed || Game.autoClickerArmed) return; // both are tap-only modes, see handleSwapTap/handleAutoClickerPick
+    if (Game.swapArmed || Game.autoClickerArmed) return; // tap-only modes
     const tileData = Game.state.grid[pointerState.idx];
     if (!tileData) return;
     pointerState.dragging = true;
@@ -174,12 +157,7 @@ function handleTap(idx) {
   const tileHere = state.grid[idx];
 
   if (tileHere) {
-    // Merging is drag-only now (see the `dragging` branch in onPointerUp) -
-    // tapping a filled tile no longer selects it as a merge target, it
-    // just grants the tap bonus every time (the "clicker" aspect). Under
-    // the old tap-to-tap-merge flow, a tap that happened to complete a
-    // merge skipped the bonus - now every tap on a tile is consistently
-    // rewarded.
+    // Merging is drag-only: tapping a tile always grants the tap bonus.
     grantTapBonus(idx);
     return;
   }
@@ -199,12 +177,9 @@ function handleLockedTap(idx) {
     else { Sfx.error(); toast(result.reason === "funds" ? "Pas assez de Gems." : "Impossible de débloquer cette case."); }
     renderAll();
     if (result.ok) {
-      renderCell(idx, { justUnlocked: true }); // layer the unlock-pop animation on top of the plain renderAll() paint
+      renderCell(idx, { justUnlocked: true }); // unlock animation on top of renderAll()
       triggerResonanceIfLucky(state);
-      // Résonance bumps extraUnlockedCount, i.e. unlockCost() for every cell
-      // still locked - and it fires AFTER the renderAll() above, so without
-      // this they keep advertising the old, cheaper price. Same call the
-      // other two unlock paths already make (tryUnlock, onUnlockCellAd).
+      // Résonance raises unlockCost() after renderAll(), so refresh the displayed prices.
       refreshLockedCellPrices();
     }
     saveState(state);
@@ -213,43 +188,25 @@ function handleLockedTap(idx) {
   tryUnlock(idx);
 }
 
-// Merges landing within this window of each other count as a "streak" -
-// scales the impact effect and raises the reward chime's pitch a step each
-// time (see Sfx.meteorImpact in audio.js), so fast merge chains feel
-// increasingly rewarding. Resets the moment the player pauses.
+// Merges closer than this count as a streak (raises the combo chime, see Sfx.meteorImpact).
 const MERGE_STREAK_WINDOW_MS = 900;
 
 function attemptMerge(fromIdx, toIdx) {
   const state = Game.state;
   const before = state.grid[fromIdx];
   if (!before) return;
-  // Loris: "a partir du niveau 14, si on fusionne deux cases de niveau 14
-  // elles redeviennent des cases de niveau 1 [...] comme ça on pourrait
-  // reproduire cela à l'infini" - merging two tiles at the true top tier
-  // (currently Genèse) used to be blocked outright (toast + refuse); now
-  // performMerge() (economy.js) loops them back to tier 1 with the cycle
-  // counter (tile.cycle) bumped instead, so this early-exit is gone -
-  // performMerge's own a.tier!==b.tier / cycle-mismatch checks are the
-  // only remaining guards.
   const result = performMerge(state, fromIdx, toIdx);
   if (!result) return;
   const now = performance.now();
   Game.mergeStreak = (now - Game.lastMergeAt < MERGE_STREAK_WINDOW_MS) ? Game.mergeStreak + 1 : 0;
   Game.lastMergeAt = now;
-  // Easter egg "La Cascade" (Loris: enchaîner EASTER_EGG_CHAIN_COUNT
-  // fusions en un temps assez court) - a rolling window of merge
-  // timestamps, in-memory only (Game, not state - doesn't need to survive
-  // a reload mid-streak). Pruned to the trailing EASTER_EGG_CHAIN_MS on
-  // every merge.
+  // Easter egg "La Cascade": rolling window of recent merge times, kept in memory only.
   Game.mergeChainTimes.push(now);
   Game.mergeChainTimes = Game.mergeChainTimes.filter(t => now - t <= EASTER_EGG_CHAIN_MS);
   const chainEggResult = Game.mergeChainTimes.length >= EASTER_EGG_CHAIN_COUNT
     ? unlockEasterEgg(state, "merge_chain") : null;
   renderCell(fromIdx);
-  // Keep showing the pre-merge tile at toIdx while the spark flicks in, and
-  // hold every reward/reveal cue (tile swap, toast, haptic, god-ritual
-  // popup) until the impact fires - it's ~110ms later, so this is still
-  // effectively instant, just synced to the visual/audio landing.
+  // Keep the old tile visible and delay every reward cue until the impact (~110 ms later).
   renderMergeStandIn(toIdx, before.tier, before.cycle || 0);
   playMeteorMerge(toIdx, () => {
     renderCell(toIdx, { merged: true });
@@ -258,10 +215,7 @@ function attemptMerge(fromIdx, toIdx) {
     if (result.looped) {
       toast(`✨ Nouvelle boucle amorcée - palier ×${result.newCycle} !`);
     } else if (result.newTier === UNIVERSE_TIER) {
-      // "Univers créé" stays tied to UNIVERSE_TIER specifically (config.js)
-      // - that's still the real Big-Bang-eligibility milestone, whether or
-      // not the run pushes further, and replays identically on every later
-      // cycle's climb back up to it.
+      // Univers is the Big Bang milestone, so its toast replays on every loop.
       toast("Univers créé ! 💥");
     } else if (result.newTier === TIERS.length) {
       toast(`${tierName(result.newTier)} atteint(e) - le sommet de la Création ! 🌟`);
@@ -291,11 +245,7 @@ function maybeOpenBigBangPrompt() {
   setTimeout(openBigBangModal, 700);
 }
 
-// Loris: "j'aimerais que ce soit bien un pop up [...] pas simplement une
-// petite bannière" - Game.pendingVipGems is set by grantVipDailyGemsIfDue()
-// (retention.js), consumed here at the next safe moment (main.js, right
-// after the boot/resume tutorial-or-offline-gain decision), same pattern
-// as Game.pendingGodRitual above.
+// Opens the VIP daily Gems modal queued by grantVipDailyGemsIfDue() (retention.js).
 function maybeOpenVipGemsModal() {
   if (Game.pendingVipGems) {
     const amount = Game.pendingVipGems;
@@ -311,16 +261,8 @@ function maybeOpenGodRitual() {
   }
 }
 
-// Loris: "il n'y a pas de pop up quand on débloque un nouveau dieu hormis
-// pour les deux premiers" - shows the reveal for every god unlockGod()
-// (gods.js) queued (milestone/challenge/shop unlocks - the ritual pair and
-// Cosmic Box unlocks push nothing here, see unlockGod's `silent` option,
-// they already have their own reveal). Skips while the ritual picker modal
-// is up rather than stacking on top of it - called again once that closes
-// (onChooseGod, below) so anything queued during it still gets shown.
-// One at a time: closeGodUnlockModal (ui.js) calls this again on close, so
-// a rare double-unlock in the same moment reveals as two modals in a row
-// instead of overwriting each other.
+// Shows one queued god reveal (see unlockGod, gods.js). Waits while the ritual picker is open.
+// closeGodUnlockModal (ui.js) and onChooseGod call this again to show the next one.
 function maybeOpenGodRevealModal() {
   if (Game.pendingGodReveals.length === 0) return;
   if (!$("godRitualModal").classList.contains("hidden")) return;
@@ -328,10 +270,7 @@ function maybeOpenGodRevealModal() {
   openGodUnlockModal(godId);
 }
 
-// Set by checkFusionPromo() (retention.js, via trackFusionEvent) the
-// instant a fusion crosses the 10 or 50 lifetime-fusions milestone. 700ms
-// delay to match maybeOpenBigBangPrompt above - lets the merge's own
-// visual/audio impact land first instead of the promo popup racing it.
+// Delayed like maybeOpenBigBangPrompt so the merge effect lands first.
 function maybeOpenFusionPromo() {
   if (!Game.pendingPromo) return;
   const kind = Game.pendingPromo;
@@ -339,24 +278,10 @@ function maybeOpenFusionPromo() {
   setTimeout(() => openFusionPromoModal(kind), 700);
 }
 
-// Returns the Stardust actually granted, or 0 when the tap did nothing (cell
-// on cooldown, or empty). The amount is always > 0 on a real fire - tierProd
-// is at least 0.5 and every multiplier is >= 1 - so callers can test it as a
-// plain boolean.
-//
-// `opts.auto` marks a tap the PLAYER did not make - the auto-clicker's own
-// per-frame tick (tickAutoClicker below). The Stardust and the quest progress
-// are identical either way; what an automated tap must NOT do is:
-//   - reset the Erebus streak. That challenge is "fusionne 35 fois d'affilée
-//     sans jamais appuyer sur une case" - appuyer, i.e. the player pressing.
-//     Letting the clicker reset it made the challenge unprogressable during
-//     the very feature the game tells every player to claim daily.
-//   - play Sfx.tap() and saveState() at the clicker's cadence. At
-//     TAP_COOLDOWN_MS = 150ms that's ~6-7 tap beeps per second and ~6-7 full
-//     JSON.stringify + localStorage writes per second, for 10 minutes
-//     straight. The main loop already saves every tick (~1s, main.js), so
-//     nothing is lost. The auto-clicker plays no sound at all.
-// The floating "+N ✨" is still shown on every fire, automated or not.
+// Returns the Stardust granted, or 0 if the cell is empty or on cooldown (usable as a boolean).
+// `opts.auto`: tap from the auto-clicker. Same reward, but it must not:
+// - reset the Erebus streak (the challenge forbids taps by the player only)
+// - play a sound or save at ~7 times per second (the main loop already saves every second)
 function grantTapBonus(idx, opts) {
   const now = performance.now();
   if (Game.cooldownUntil[idx] > now) return 0;
@@ -376,12 +301,8 @@ function grantTapBonus(idx, opts) {
   return bonus;
 }
 
-// "Résonance des Cases" run upgrade (RUN_UPGRADE_TREE, config.js) - rolled
-// after every real unlock (tryUnlock, onUnlockCellAd, the skipCell Gems
-// shortcut), never after the starter-pack's one-time bulk grant. Shared
-// here so all 3 call sites show the same toast/animation/haptic when it
-// hits, and so the bonus cell counts toward quests/achievements exactly
-// like a normal unlock would.
+// "Résonance" roll after a gameplay unlock. Shared so all 3 unlock paths give the same feedback
+// and the bonus cell counts for quests and achievements.
 function triggerResonanceIfLucky(state) {
   const idx = maybeTriggerResonance(state);
   if (idx === null) return;
@@ -409,13 +330,7 @@ function tryUnlock(idx) {
   triggerResonanceIfLucky(state);
   refreshLockedCellPrices(); // every other locked cell's price just changed too
   updateHeader();
-  // Loris: "Case gratuite" fab should disappear once the grid is fully
-  // unlocked. updateFabs() already has that check (see fabUnlockCellAd),
-  // but this - by far the most common way to unlock a cell, tapping it and
-  // paying Stardust - never called it, only updateHeader(). The ad-watching
-  // and Gems-shortcut unlock paths both already call updateFabs()
-  // (onUnlockCellAd directly, skipCell via renderAll()), so this was the
-  // one path where unlocking the very last cell left the fab visible.
+  // Hides the "Case gratuite" fab once the last cell is unlocked.
   updateFabs();
   saveState(state);
 }
@@ -500,12 +415,7 @@ function tickAutoSpawn(now) {
 async function watchRewardedAd(state, placementId) {
   if (adsRemoved(state)) return true;
   const ok = await AdService.showRewarded(placementId);
-  // Loris: this promo used to fire on the ad-watch count alone, with no
-  // floor on how early that could happen - an active player binging ads
-  // could hit it well before the fabs (Boost/Pub contre Gems) even exist to
-  // watch ads from in the first place in some edge cases. Now also needs
-  // FUSIONS_BEFORE_REMOVE_ADS_PROMO fusions AND the shared promo-gap floor
-  // (promoGapElapsed, retention.js), same as the other two promos.
+  // The remove-ads promo also needs enough fusions and the shared promo gap.
   if (ok && trackRewardedAdWatched(state) && state.lifetime.fusions >= FUSIONS_BEFORE_REMOVE_ADS_PROMO && promoGapElapsed(state)) {
     state.promptsShown.removeAdsPrompt = true;
     markPromoShown(state);
@@ -537,16 +447,14 @@ function onBigBangConfirm() {
   saveState(state);
   maybeShowInterstitial();
   openBigBangSummaryModal({ ...runRecap, gain });
-  // After the summary, not instead of it - Loris's easter egg reveal
-  // shouldn't replace the normal Big Bang recap the player is expecting.
+  // Shown after the Big Bang summary, not instead of it.
   if (eggResult) revealEasterEgg(eggResult);
-  maybeOpenGodRevealModal(); // e.g. Thanatos - checkThanatosChallenge runs inside performBigBang above
+  maybeOpenGodRevealModal(); // e.g. Thanatos, unlocked inside performBigBang
 }
 
 function onRestartConfirm() {
   const state = Game.state;
-  // Easter egg "Le Renoncement" (Loris) - restarting while a Big Bang was
-  // already available, checked before restartRun() below wipes the grid.
+  // Easter egg "Le Renoncement": restart while Big Bang is available. Check before the reset.
   const eggResult = hasUniverseTile(state) ? unlockEasterEgg(state, "restart_at_top") : null;
   restartRun(state);
   Game.bigBangPromptShown = false;
@@ -619,15 +527,9 @@ function onDailyClaim() {
 }
 
 // ---------------- Wheel actions ----------------
-const WHEEL_SPIN_MS = 3500; // MUST match .wheel's CSS transition duration (style.css)
+const WHEEL_SPIN_MS = 3500; // must match .wheel's CSS transition duration (style.css)
 
-// A run of "tick" sounds (Sfx.wheelTick, audio.js) at a decelerating rate
-// over the spin, mimicking a real prize wheel clicking past its pegs -
-// approximates the CSS transition's cubic-bezier(.17,.67,.2,1) ease-out
-// (fast start, slow finish) with a geometrically growing interval between
-// ticks, since precisely inverting that easing curve for tick timing isn't
-// worth the complexity for a sound effect. Previously the wheel spun in
-// total silence.
+// Wheel clicks at a slowing rate, approximating the CSS ease-out.
 function scheduleWheelTicks(totalMs) {
   let elapsed = 0;
   let interval = 45;
@@ -642,29 +544,10 @@ function scheduleWheelTicks(totalMs) {
   }
   tick();
 }
-// Bug (Loris): "je suis tombé sur le rouge mais j'ai pas eu la bonne
-// récompense". Root cause - this used to pick a completely RANDOM landing
-// angle (1440 + random 360deg) with zero connection to which prize
-// spinWheel() actually awarded a few lines below in the caller's callback -
-// two independent random rolls, so the wheel visually landing on a given
-// color had nothing to do with the reward you actually got, most of the
-// time. Fixed by determining the prize FIRST (onWheelSpinFree/Ad below now
-// call spinWheel() before starting the animation, not after), then
-// computing the exact rotation that lands the pointer (fixed at the top,
-// 0deg) on THAT prize's own slice - see wheelSegmentBounds() (retention.js,
-// shared with buildWheelSegments' rendering so the two can never disagree
-// on where a slice actually is). A small random jitter within the slice
-// (60% of its width, centered) keeps every spin looking a little different
-// without ever landing close enough to a boundary to read as the wrong
-// color.
-//
-// Also still fixes the earlier bug: "la roue ne tourne pas [...] pas le
-// meme effet visuel" when spinning a second time (free spin, then
-// immediately the ad-bonus spin) without closing the modal - the wheel's
-// rotation persists across spins within the same modal session (only reset
-// to 0deg on openWheelModal), so a naive fixed target could land behind (or
-// barely past) wherever the previous spin left it. Still tracks a running
-// total and always adds a forward delta on top of the current rotation.
+// The prize is picked before the animation; this rotates the wheel so the top pointer
+// lands inside that prize's slice (random offset within the middle 60%).
+// Rotation accumulates across spins and always moves forward, so a second spin
+// in the same modal still turns.
 let wheelRotation = 0;
 function spinVisual(prizeIndex, cb) {
   const wheel = $("wheelEl");
@@ -672,22 +555,16 @@ function spinVisual(prizeIndex, cb) {
   const span = endDeg - startDeg;
   const jitter = (Math.random() - 0.5) * span * 0.6;
   const midDeg = (startDeg + endDeg) / 2 + jitter;
-  const desiredMod = (360 - midDeg + 360) % 360; // wheelRotation mod 360 that puts this slice's midDeg under the fixed top pointer
+  const desiredMod = (360 - midDeg + 360) % 360; // rotation that puts midDeg under the top pointer
   const currentMod = ((wheelRotation % 360) + 360) % 360;
-  const forwardDelta = (desiredMod - currentMod + 360) % 360; // shortest forward-only rotation from here to the target orientation
-  const extraSpins = (4 + Math.floor(Math.random() * 2)) * 360; // a few full turns on top, purely visual
+  const forwardDelta = (desiredMod - currentMod + 360) % 360; // forward-only rotation to the target
+  const extraSpins = (4 + Math.floor(Math.random() * 2)) * 360;
   wheelRotation += extraSpins + forwardDelta;
   wheel.style.transform = `rotate(${wheelRotation}deg)`;
   scheduleWheelTicks(WHEEL_SPIN_MS);
   setTimeout(cb, WHEEL_SPIN_MS);
 }
-// Shared landing step for both spins below - renderAll() rather than just
-// updateHeader/updateFabs because the "1 case débloquée" prize (WHEEL_PRIZES,
-// retention.js) mutates state.unlocked. Without a grid re-render the cell the
-// player just won kept drawing as locked, at its old price, until some
-// unrelated action happened to redraw it - and tapping it went straight to
-// handleTap, silently "selecting" a cell that still looked locked. Same
-// reason onDailyClaim() calls renderAll() for this very reward type.
+// renderAll(): the "1 case débloquée" prize changes state.unlocked, so the grid must redraw.
 function finishWheelSpin(prize) {
   $("wheelResult").innerHTML = prize ? `Gagné : ${withCurrencyIcons(prize.label)}` : "Déjà utilisé aujourd'hui.";
   Sfx.wheelWin();
@@ -709,14 +586,7 @@ async function onWheelSpinAd() {
 }
 
 // ---------------- Unlock cell fab (rewarded ad) ----------------
-// Loris: "quand on clique sur un bouton boost x2, +10 gemmes et case
-// gratuite il faut un message pour confirmer que l'utilisateur veut
-// regarder une publicité pour recevoir la récompense en question". Skipped
-// entirely when ads are removed (purchase or VIP) - watchRewardedAd()
-// itself grants the reward instantly with no video then, so "confirm you
-// want to watch an ad" would be asking about something that isn't
-// happening. Reuses the same openConfirmModal (ui.js) as every purchase
-// confirmation.
+// Asks before showing an ad. Skipped when ads are removed: the reward is granted instantly.
 function confirmThenWatchAd(state, title, text, action) {
   if (adsRemoved(state)) { action(); return; }
   openConfirmModal({ title, text, confirmLabel: "Regarder la pub", onConfirm: action });
@@ -750,15 +620,7 @@ function onUnlockCellAd() {
 }
 
 // ---------------- Gems-for-ad (shop + home screen) ----------------
-// Loris: "le bouton +20 gemmes une fois par jour il devrait être gratuit
-// aussi (reset à minuit)." Then, once that's spent: "il faudrait qu'on
-// puisse faire ça [...] cinq fois avant que ça se bloque derrière un timer
-// de cinq minutes [...] comme on avait avant [...] et à minuit ça se
-// reset" - the free daily claim comes first (isGemsAdFreeAvailable,
-// economy.js, no ad at all), then the original "up to GEMS_AD_STREAK_SIZE
-// ad watches in a row, then GEMS_AD_COOLDOWN_MS pause" streak system is
-// kept exactly as it was, just moved to sit behind that free claim instead
-// of being replaced by it.
+// The first claim of the day is free, then ads with a streak and cooldown (economy.js).
 function onWatchGemsAd() {
   const state = Game.state;
   if (isGemsAdFreeAvailable(state)) {
@@ -789,16 +651,8 @@ function onWatchGemsAd() {
   });
 }
 
-// ---------------- Auto-clicker (replaces the old Boost x2) ----------------
-// Loris: "ajouter un bonus 'clicker automatique' [...] accessible
-// gratuitement que une fois par jour (reset à minuit) et ça dure pendant 10
-// minutes. Si on veut réactiver après les 10 minutes alors on doit regarder
-// une publicité. [...] Je pense que ce serait un meilleur bonus que le
-// boost x2. Il devrait remplacer le boost x2. [...] Le clicker le joueur
-// aurait le choix de le mettre où il veut sur la grille." Same free-once-
-// then-ad-gated pattern as the Gems-ad button above; picking the target
-// cell is a separate step (armAutoClickerPicker/handleAutoClickerPick)
-// after the free/ad gate, tap-only like the Échanger picker (Game.swapArmed).
+// ---------------- Auto-clicker ----------------
+// Free once a day, then an ad. The player then picks the target cell (tap-only mode).
 function onAutoClickerClick() {
   const state = Game.state;
   if (Game.autoClickerArmed) {
@@ -812,11 +666,7 @@ function onAutoClickerClick() {
     toast("Clicker déjà actif encore " + formatDuration(state.autoClicker.activeUntil - now));
     return;
   }
-  // Game.autoClickerPaid: an ad was already watched for this activation but
-  // no cell was picked yet. Cancelling the picker (a second tap on this fab
-  // or its Boutique card - easy to do by accident, since tapping a locked or
-  // empty cell keeps the picker open) used to drop it, and the next tap asked
-  // for a whole new ad. The earned activation now waits until it's used.
+  // Game.autoClickerPaid: the watched ad stays earned if the picker is cancelled.
   if (isAutoClickerFreeAvailable(state) || Game.autoClickerPaid) { armAutoClickerPicker(); return; }
   confirmThenWatchAd(state, "Clicker automatique",
     "Ton clicker gratuit du jour est déjà utilisé. Regarde une publicité pour le relancer tout de suite, pour 10 minutes de plus.",
@@ -830,7 +680,7 @@ function onAutoClickerClick() {
 }
 function armAutoClickerPicker() {
   Game.autoClickerArmed = true;
-  closePanel(); // no-op from the fab/intro modal (home screen already), needed when armed from the Boutique card below - the grid must be visible to tap a cell
+  closePanel(); // needed from the Boutique card: the grid must be visible
   toast("🤖 Choisis une case avec une tuile pour le clicker automatique.");
   renderAll();
 }
@@ -838,7 +688,7 @@ function handleAutoClickerPick(idx) {
   const state = Game.state;
   if (!state.unlocked[idx] || !state.grid[idx]) { toast("Choisis une case débloquée avec une tuile."); Sfx.error(); return; }
   Game.autoClickerArmed = false;
-  Game.autoClickerPaid = false; // the watched ad (if any) is spent now, see onAutoClickerClick
+  Game.autoClickerPaid = false; // the watched ad is spent now
   activateAutoClicker(state, idx);
   Sfx.purchase();
   toast("🤖 Clicker automatique activé pour 10 min !");
@@ -846,47 +696,30 @@ function handleAutoClickerPick(idx) {
   updateFabs();
   saveState(state);
 }
-// Called every frame from main.js's loop. grantTapBonus (above) already
-// gates itself on the cell's own TAP_COOLDOWN_MS via Game.cooldownUntil, so
-// this can just call it every frame without any extra throttling of its
-// own - it silently no-ops between real ticks. Every real fire gets its own
-// pulse and floating "+N ✨" (no sound), so the feedback matches the actual
-// tap cadence. `{ auto: true }` also keeps grantTapBonus from resetting the
-// Erebus streak, playing a sound or saving on every single fire - see its
-// comment above.
+// Called every frame. grantTapBonus handles the per-cell cooldown, so no throttling here.
 function tickAutoClicker() {
   const state = Game.state;
   const ac = state.autoClicker;
   const idx = ac.targetIdx;
   const isActive = idx !== null && ac.activeUntil > Date.now();
   if (idx !== null && cellEls[idx]) cellEls[idx].classList.toggle("autoClickTarget", isActive);
-  if (!isActive || !state.grid[idx]) return; // inactive, or paused because the target cell is currently empty
+  if (!isActive || !state.grid[idx]) return; // inactive, or target cell empty (paused)
   if (grantTapBonus(idx, { auto: true })) playAutoClickEffect(idx);
 }
-// No timer to strip the class afterwards: a pending one from the previous
-// fire (TAP_COOLDOWN_MS earlier) would cut the next pulse short, and a
-// finished non-looping animation leaves no visual trace anyway.
+// No timer removes the class: it would cut the next pulse short.
 function playAutoClickEffect(idx) {
   const cell = cellEls[idx];
   if (!cell) return;
   cell.classList.remove("autoClickPulse");
-  void cell.offsetWidth; // force reflow so re-adding the class restarts the animation even if it's still finishing
+  void cell.offsetWidth; // force reflow to restart the animation
   cell.classList.add("autoClickPulse");
 }
-// Loris: "ajouter une demande de confirmation quand on clique sur le
-// bouton échanger [...] possible d'annuler ou de confirmer mais aussi de
-// cocher une case pour ne plus jamais voir ce message". Only the fab
-// (home-screen "Échanger" button) gets this - the Boutique's own
-// "Échanger deux cases" gem-shop card already goes through
-// openConfirmModal via buyBtn() (ui.js) like every other purchase there.
+// Home-screen swap button: confirmation with "don't ask again".
+// The Boutique card already confirms through buyBtn() (ui.js).
 function onSwapCellsClick() {
   const state = Game.state;
   const cost = SHOP_GEM_ITEMS.find(i => i.id === "swapCells").cost;
-  // Loris: "si on a pas assez de gemmes ça devrait nous offrir la
-  // possibilité de regarder une pub [...] pour pouvoir échanger deux cases
-  // sans débourser de gemmes" - checked before the normal paid-confirm flow
-  // below, same confirmThenWatchAd pattern already used by "Case gratuite"
-  // (onUnlockCellAd) instead of a dead-end "Pas assez de Gems." toast.
+  // Not enough Gems: offer an ad for a free swap instead.
   if (state.gems < cost) {
     if (Date.now() < state.cooldowns.swapAdUntil) {
       toast("Disponible dans " + formatDuration(state.cooldowns.swapAdUntil - Date.now()));
@@ -928,10 +761,7 @@ function onBuyGemItem(itemId) {
     if (Game.state.gems < SHOP_GEM_ITEMS.find(i => i.id === "swapCells").cost) { Sfx.error(); toast("Pas assez de Gems."); return; }
     Game.swapArmed = true;
     Game.swapFirstIdx = null;
-    // This entry point is the PAID swap. swapFree is only cleared when a swap
-    // actually completes (handleSwapTap), so an ad-earned free swap that was
-    // armed and then abandoned would still be flagged free here and hand out
-    // this purchase for nothing.
+    // Paid swap: clear any leftover free swap from an abandoned ad-earned one.
     Game.swapFree = false;
     closePanel();
     toast("Choisis deux cases à échanger.");
@@ -944,11 +774,7 @@ function onBuyGemItem(itemId) {
   if (itemId === "cosmicBox") {
     openCosmicBoxRevealModal(result.box);
   } else if (itemId === "streakFreeze") {
-    // Buying this has no visible on-screen change (unlike skipCell
-    // unlocking a cell, or cosmicBox's reveal modal) - it just increments a
-    // hidden counter used much later, the next time a login day is missed.
-    // The generic "Achat effectue !" toast gave no sense anything had
-    // really happened; naming the effect and the new charge count instead.
+    // No visible change otherwise, so the toast names the effect and the charge count.
     toast("❄️ Gel de série ajouté ! (" + Game.state.dailyLogin.streakFreezeCharges + " en réserve)");
   } else {
     toast("Achat effectué !");
@@ -989,21 +815,13 @@ async function onBuyIAP(productId) {
   switch (productId) {
     case "remove_ads": state.iap.removeAds = true; break;
     case "starter_pack":
-      // Non-consumable: a repeat purchase must not stack another 500 Gems,
-      // 3 cells and 1h of clicker on top of the first.
+      // One-time purchase: never grant twice.
       if (state.iap.starterPack) break;
       state.iap.starterPack = true;
       state.gems += 500; state.lifetime.gemsEarned += 500;
       { const locked = []; for (let i = 0; i < TOTAL; i++) if (!state.unlocked[i]) locked.push(i);
         for (let k = 0; k < 3 && locked.length; k++) { const pick = locked.splice(Math.floor(Math.random() * locked.length), 1)[0]; state.unlocked[pick] = true; state.extraUnlockedCount += 1; } }
-      // Was a flat 1h production-boost grant (prodBoostActiveUntil, now
-      // gone) - the same mechanic that replaced Boost x2 everywhere else
-      // (activateAutoClicker, economy.js) grants an equivalent 1h here,
-      // auto-targeting the player's own highest-tier occupied cell since
-      // this grant is programmatic, not player-picked like every other
-      // activation of this feature. keepFreeDaily: this is bought content on
-      // top of the daily allowance, not a spend of it - without it, buying
-      // the pack before using today's free clicker silently burned it.
+      // 1h auto-clicker on the highest-tier tile. keepFreeDaily: doesn't consume today's free use.
       { let bestIdx = null, bestTier = 0;
         for (let i = 0; i < TOTAL; i++) { const t = state.grid[i]; if (t && t.tier > bestTier) { bestTier = t.tier; bestIdx = i; } }
         if (bestIdx !== null) activateAutoClicker(state, bestIdx, { durationMs: 3600000, keepFreeDaily: true }); }
@@ -1026,16 +844,12 @@ async function onRestorePurchases() {
 }
 function onChooseGod(godId) {
   const state = Game.state;
-  // Loris: "il faudrait qu'on puisse changer de dieu en pleine partie, pas
-  // besoin d'attendre le prochain big bang" - chooseGod() (gods.js) always
-  // switches immediately now, so there's only ever this one outcome.
   chooseGod(state, godId);
   Sfx.purchase();
   toast(`${getGod(godId).name} t'accompagne désormais !`);
   refreshCurrentPanel();
   saveState(state);
 }
-// Loris: "on peut l'équiper ou fermer le pop up" (godUnlockModal, ui.js).
 function onEquipGodFromUnlockModal() {
   if (godUnlockModalGodId) onChooseGod(godUnlockModalGodId);
   closeGodUnlockModal();
@@ -1128,18 +942,10 @@ function wireClickSound() {
 }
 
 // Tapping the dark backdrop closes whichever modal is open, same as its own
-// close/cancel button. "Same as" has to mean running that button's handler,
-// not just hiding the overlay - a bare hide skipped real work:
-//   - godUnlockModal: closeGodUnlockModal drains the reveal queue, so a
-//     double unlock left the 2nd god stuck until some unrelated later merge.
-//   - confirmActionModal / fusionPromoModal / eggFinaleModal: their close
-//     handlers clear pending state (the queued action, the promo's product,
-//     the finale's still-running burst/sparkle nodes).
-// Modals without an entry here have nothing beyond the hide to do.
-// Never dismissable from the backdrop:
-//   - godRitualModal: a mandatory one-time choice with no close button.
-//   - offlineModal: only its two buttons pay the pending gain out, so a
-//     backdrop tap silently threw away the player's offline earnings.
+// close/cancel button, by calling its close handler when it has one (it clears pending state).
+// Never closable from the backdrop:
+// - godRitualModal: mandatory choice
+// - offlineModal: only its buttons pay out the offline gain
 const MODAL_BACKDROP_LOCKED = new Set(["godRitualModal", "offlineModal"]);
 function wireModalBackdropClose() {
   const closeHandlers = {
@@ -1163,9 +969,6 @@ function wireEvents() {
   document.addEventListener("pointerdown", onPointerDown, { passive: false });
   document.addEventListener("touchstart", onPointerDown, { passive: false });
 
-  // Used to be one button that opened a choice modal (Stardust vs Gems) -
-  // Loris found the extra step frustrating, now each currency has its own
-  // direct-action button (see .invokeSection, index.html).
   dom.invokeBtnStardust.addEventListener("click", () => { ensureAudio(); doInvoke(); });
   dom.invokeBtnGems.addEventListener("click", () => { ensureAudio(); doInvokeWithGems(); });
   dom.bigBangBtn.addEventListener("click", () => openBigBangModal());
@@ -1179,20 +982,13 @@ function wireEvents() {
   dom.panelClose.addEventListener("click", closePanel);
 
   $("fabShop").addEventListener("click", () => openPanel("shop"));
-  // Loris: le panneau Alchimie Stellaire (RUN_UPGRADE_TREE) doit être accessible
-  // directement depuis l'écran de jeu, pas seulement enfoui dans le menu ☰ -
-  // fab toujours visible, comme Boutique, plutôt que conditionnel comme
-  // Cadeau/Roue.
   $("fabRunUpgrades").addEventListener("click", () => openPanel("runUpgrades"));
   dom.fabDailyLogin.addEventListener("click", openDailyModal);
   dom.fabWheel.addEventListener("click", openWheelModal);
   $("fabAutoClicker").addEventListener("click", onAutoClickerClick);
   $("autoClickerIntroPick").addEventListener("click", () => {
     $("autoClickerIntroModal").classList.add("hidden");
-    // Through onAutoClickerClick, not straight to armAutoClickerPicker: the
-    // intro only opens when the fab is first revealed, but the Boutique card
-    // can already have spent today's free use (or have one still running) by
-    // then - arming the picker directly handed out a second free 10 minutes.
+    // Through onAutoClickerClick: today's free use may already be spent from the Boutique.
     onAutoClickerClick();
   });
   $("fabUnlockCellAd").addEventListener("click", onUnlockCellAd);

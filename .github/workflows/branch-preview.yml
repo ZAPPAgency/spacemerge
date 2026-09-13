@@ -10,9 +10,8 @@ on:
     branches-ignore: [main, gh-pages]
   delete:
 
-# Groupe par branche, PAS partagé avec deploy.yml / preview.yml : un seul run
-# peut être en attente par groupe, donc un groupe commun fait s'annuler les
-# workflows entre eux.
+# One group per branch. Never share it with other workflows: a group keeps only
+# one pending run, so a shared group cancels the other workflows.
 concurrency:
   group: branch-preview-${{ github.ref }}
   cancel-in-progress: true
@@ -69,8 +68,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   cleanup:
-    # Le `delete` se déclenche aussi quand gh-pages elle-même est supprimée :
-    # dans ce cas il n'y a plus rien à nettoyer.
+    # Deleting gh-pages itself also fires `delete`: nothing to clean up then.
     if: >-
       github.event_name == 'delete' &&
       github.event.ref_type == 'branch' &&

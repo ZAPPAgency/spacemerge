@@ -57,11 +57,6 @@
           /></span>
           <span class="value" id="gemsValue">0</span>
         </div>
-        <!-- Loris: "le bouton boutique [...] pourrait être en réalité dans
-         la barre tout en haut a gauche du bouton recommencer" - moved out
-         of the fab stack below into the topbar itself, icon-only like
-         fabRestart/menuBtn (no room for a label up here). Same id, same
-         click handler (wireEvents(), input.js) - only the markup moved. -->
         <button class="iconBtn" id="fabShop" aria-label="Boutique">
           <img class="uiIcon" src="assets/ui/boutique.png" alt="" />
         </button>
@@ -87,12 +82,7 @@
             ><img class="uiIcon" src="assets/ui/dieux.png" alt=""
           /></span><span class="fabLabel" id="fabGodName">-</span>
         </button>
-        <!-- Loris: fabs below should "apparaître petit à petit lors des
-         premières fusions" instead of all being visible on a fresh save -
-         each starts hidden here and updateFabs() (ui.js) reveals it (with
-         a one-shot pop animation, see .fabReveal in style.css) once
-         state.lifetime.fusions clears its own discovery threshold
-         (FAB_DISCOVERY_FUSIONS, ui.js). -->
+        <!-- Hidden until lifetime fusions reach FAB_DISCOVERY_FUSIONS (updateFabs, ui.js). -->
         <button class="fab hidden" id="fabRunUpgrades">
           <span class="fabIcon"
             ><img class="uiIcon" src="assets/ui/investir.png" alt=""
@@ -113,10 +103,6 @@
             ><img class="uiIcon" src="assets/ui/case_gratuite.png" alt=""
           /></span><span class="fabLabel">Case gratuite</span>
         </button>
-        <!-- "Clicker automatique" (Loris) - replaces the old Boost x2, same
-         fab slot/style. Icon reused from Boost for now (assets/ui/boost.png)
-         - a dedicated illustration can follow later, same as every other
-         custom icon in this game (give a Midjourney prompt when asked). -->
         <button class="fab featured hidden" id="fabAutoClicker">
           <span class="fabIcon"
             ><img class="uiIcon" src="assets/ui/boost.png" alt=""
@@ -127,10 +113,7 @@
             ><img class="uiIcon" src="assets/ui/gems_ad.png" alt=""
           /></span><span class="fabLabel" id="fabGemsAdLabel">Pub</span>
         </button>
-        <!-- Secret 4-egg challenge (Loris) - stays hidden (not gated by
-         FAB_DISCOVERY_FUSIONS like the fabs above, see updateFabs()) until
-         state.easterEggs.unlockedIds has its first entry, then never hides
-         again. -->
+        <!-- Hidden until the first easter egg is found. -->
         <button class="fab hidden" id="fabSecrets">
           <span class="fabIcon"
             ><img class="uiIcon" src="assets/ui/secret-egg.png" alt=""
@@ -152,25 +135,14 @@
             </button>
           </div>
         </div>
-        <!-- Loris: "Échanger deux cases" (Boutique Gems) is a genuinely
-         useful service, buried 3 taps deep - surfacing it right next to
-         Invoquer should make it easier to reach for AND make Gems (so
-         watching Gems ads) more desirable. Reuses the exact same
-         onBuyGemItem("swapCells") flow as the Boutique's own button - see
-         wireEvents() (input.js). -->
+        <!-- Swap shortcut next to Invoquer, same flow as the Boutique item. -->
         <div class="swapSection">
           <div class="invokeSectionLabel">Échanger</div>
           <div class="invokeSectionRow">
-            <!-- Contenu remplacé à chaque frame par updateHeader() (ui.js) :
-                 coût en Gems, ou l'offre "pub = échange gratuit" quand le
-                 joueur n'a pas assez de Gems. -->
+            <!-- Filled by updateHeader() (ui.js): Gems cost, or the free-swap ad offer. -->
             <button class="btn swapCellsBtn" id="fabSwapCells" aria-label="Échanger deux cases">
               <img class="inlineCurrencyIcon" src="assets/ui/gems_ad.png" alt="Gems" />50
             </button>
-            <!-- Loris: "le bouton de gestion des skins devrait se trouver a
-             droite du bouton échanger" - moved out of the fab stack, same
-             id/click handler (wireEvents(), input.js), now a plain iconBtn
-             matching fabShop/fabRestart's style. -->
             <button class="iconBtn" id="fabSkins" aria-label="Gérer les skins">
               <img class="uiIcon" src="assets/ui/palette.png" alt="" />
             </button>
@@ -336,7 +308,7 @@
           Déclencher le Big Bang ?
         </h3>
         <p id="bigBangText"></p>
-        <!-- One line - see the white-space:pre-line note on removeAdsPromptModal above. -->
+        <!-- Keep on one line: .modalCard p uses white-space: pre-line. -->
         <p class="modalWarn">La grille et le Stardust actuels seront réinitialisés. L'Énergie Cosmique, les Gems, l'Ascension et vos succès sont conservés pour toujours.</p>
         <div class="modalBtns">
           <button class="btn" id="bigBangCancel">Annuler</button>
@@ -376,21 +348,12 @@
     </div>
 
     <!-- Voluntary restart (no Universe tile required, unlike Big Bang) -->
-    <!-- Generic "es-tu sûr ?" gate before ANY purchase (Boutique Gems items,
-     achats reels/IAP, promos ponctuelles) - Loris: "il faut demander une
-     confirmation si l'utilisateur clique sur acheter [...] pareil dans la
-     boutique il faut toujours demander une confirmation pour tout les
-     services". One shared modal, content filled in by openConfirmModal()
-     (ui.js) right before it's shown, instead of duplicating a confirm step
-     at every single call site. -->
+    <!-- Shared confirmation before any purchase, filled by openConfirmModal() (ui.js). -->
     <div class="modalOverlay hidden" id="confirmActionModal">
       <div class="modalCard">
         <h3 id="confirmActionTitle">-</h3>
         <p id="confirmActionText"></p>
-        <!-- Hidden by default - only shown when the caller passes a
-         dontAskKey to openConfirmModal() (ui.js), e.g. the Échanger
-         button (Loris: "possible de cocher une case pour ne plus jamais
-         voir ce message"). -->
+        <!-- Shown only when openConfirmModal() receives a dontAskKey. -->
         <label class="confirmDontAskRow hidden" id="confirmActionDontAskRow">
           <input type="checkbox" id="confirmActionDontAsk" />
           <span>Ne plus jamais demander</span>
@@ -408,7 +371,7 @@
           <img class="inlineCurrencyIcon" src="assets/ui/recommencer.png" alt="" />
           Recommencer la partie ?
         </h3>
-        <!-- One line each - see the white-space:pre-line note on removeAdsPromptModal above. -->
+        <!-- Keep on one line each: .modalCard p uses white-space: pre-line. -->
         <p>Tu vas perdre la progression de cette partie : la grille et le Stardust actuels repartiront de zéro.</p>
         <p class="modalWarn">L'Énergie Cosmique, les Gems, l'Ascension, les Dieux et vos succès sont conservés pour toujours.</p>
         <div class="modalBtns">
@@ -482,10 +445,7 @@
       </div>
     </div>
 
-    <!-- Secret 4-egg challenge (Loris) - see EASTER_EGGS (config.js),
-     unlockEasterEgg() (gods.js), revealEasterEgg() (ui.js). -->
-    <!-- Individual egg found - a modest reveal (unlike the grand finale
-     below, reserved for the 4th). -->
+    <!-- Secret 4-egg challenge: single egg found. -->
     <div class="modalOverlay hidden" id="eggFoundModal">
       <div class="modalCard eggFoundCard">
         <img class="eggFoundIcon" src="assets/ui/secret-egg.png" alt="" />
@@ -496,8 +456,7 @@
       </div>
     </div>
 
-    <!-- Persistent counter, reachable via fabSecrets once the first egg is
-     found - stays reachable forever after, whatever the progress. -->
+    <!-- Secrets counter, opened from fabSecrets. -->
     <div class="modalOverlay hidden" id="secretsModal">
       <div class="modalCard">
         <h3><img class="inlineCurrencyIcon" src="assets/ui/secret-egg.png" alt="" /> Secrets du Cosmos</h3>
@@ -507,11 +466,7 @@
       </div>
     </div>
 
-    <!-- Grand finale (all 4 found, Ananké unlocked) - its own fullscreen
-     overlay, not a plain .modalCard, deliberately the single biggest
-     visual moment in the game (Loris: "l'animation la plus impressionnante
-     jamais proposée"). Particle/ray elements are generated at runtime
-     (openEggFinaleModal, ui.js) into #eggFinaleBurst/#eggFinaleSparkles. -->
+    <!-- Grand finale (all 4 eggs). Rays and sparkles are generated by openEggFinaleModal() (ui.js). -->
     <div class="modalOverlay hidden eggFinaleOverlay" id="eggFinaleModal">
       <div class="eggFinaleSparkles" id="eggFinaleSparkles"></div>
       <div class="eggFinaleStage" id="eggFinaleStage">
@@ -526,9 +481,7 @@
       </div>
     </div>
 
-    <!-- Skin preview: shows a mini grid with a given emoji set's tiles applied,
-     without actually equipping it - opened by the "👁 Aperçu" button on each
-     cosmetic tile (renderCosmeticGrid, ui.js). -->
+    <!-- Skin preview without equipping, opened by the "Aperçu" button (renderCosmeticGrid, ui.js). -->
     <div class="modalOverlay hidden" id="skinPreviewModal">
       <div class="modalCard skinPreviewCard">
         <h3 id="skinPreviewTitle">Aperçu</h3>
@@ -587,9 +540,7 @@
           <img class="inlineCurrencyIcon" src="assets/ui/shield.png" alt="" />
           Marre des pubs ?
         </h3>
-        <!-- One line on purpose - .modalCard p has white-space:pre-line, a
-         "harmless" source wrap here becomes an actual forced line break
-         (same bug already fixed once on #godRitualModal). -->
+        <!-- Keep on one line: .modalCard p uses white-space: pre-line. -->
         <p>Tu as pas mal regardé de publicités ces derniers temps. Avec « Suppression des pubs », tous ces bonus (boost, quête bonus...) deviennent instantanés, pour toujours.</p>
         <div class="modalBtns">
           <button class="btn" id="removeAdsPromptLater">Plus tard</button>
@@ -600,9 +551,7 @@
       </div>
     </div>
 
-    <!-- Fusion-milestone IAP soft-prompt (10 fusions -> starter pack, 50 ->
-     Pass Supernova) - one shared modal, content set dynamically by
-     openFusionPromoModal() (ui.js) depending on which milestone fired. -->
+    <!-- Fusion-milestone promo, filled by openFusionPromoModal() (ui.js). -->
     <div class="modalOverlay hidden" id="fusionPromoModal">
       <div class="modalCard">
         <h3 id="fusionPromoTitle"></h3>
@@ -621,13 +570,7 @@
           <img class="inlineCurrencyIcon" src="assets/ui/dieux.png" alt="" />
           Le rituel des lunes
         </h3>
-        <!-- Was split across 2 lines in the source - .modalCard p has
-         white-space:pre-line (so multi-line reward-list text can use real
-         line breaks elsewhere), which turned that harmless-looking source
-         wrap into an actual forced line break mid-sentence, right before
-         "enfin à l'appel" (Loris: "il apparait une ligne en dessous sans
-         aucune raison"). Kept on one single line here on purpose - let it
-         wrap naturally instead. -->
+        <!-- Keep on one line: .modalCard p uses white-space: pre-line. -->
         <p>Quatre lunes se sont unies sous ta main. Un Dieu du Cosmos répond enfin à l'appel — choisis celui qui t'accompagnera pour cette partie.</p>
         <div class="godRitualList" id="godRitualList"></div>
       </div>
@@ -638,27 +581,18 @@
       <div class="modalCard" id="godDetailCard"></div>
     </div>
 
-    <!-- New god unlocked - Loris: "il n'y a pas de pop up quand on débloque
-     un nouveau dieu hormis pour les deux premiers" (Séléna/Zéphar get the
-     rituel-des-lunes picker modal above as their own reveal; every other
-     god - milestone, challenge, or bought with Gems - only ever got a
-     small 2s toast, easy to miss). This is the shared reveal for all of
-     those, see maybeOpenGodRevealModal()/unlockGod() (ui.js/gods.js). -->
+    <!-- New god unlocked, opened by maybeOpenGodRevealModal() (input.js). -->
     <div class="modalOverlay hidden" id="godUnlockModal">
       <div class="modalCard" style="text-align: center">
         <div class="godEmoji" id="godUnlockPortrait" style="width:88px;height:88px;border-radius:18px;margin:0 auto 10px;"></div>
         <h3 id="godUnlockTitle">Nouveau Dieu éveillé</h3>
         <p class="desc" id="godUnlockText"></p>
-        <!-- Loris: "on peut l'équiper ou fermer le pop up" -->
         <button class="btn primary full" id="godUnlockEquip" style="margin-bottom:8px;">Équiper</button>
         <button class="btn ghost full" id="godUnlockClose">Fermer</button>
       </div>
     </div>
 
-    <!-- VIP daily Gems (Pass Supernova) - Loris: "j'aimerais que ce soit
-     bien un pop up qui apparaisse devant l'écran [...] et pas simplement
-     une petite bannière en bas" - see maybeOpenVipGemsModal()/
-     grantVipDailyGemsIfDue() (ui.js/retention.js). -->
+    <!-- VIP daily Gems, opened by maybeOpenVipGemsModal() (input.js). -->
     <div class="modalOverlay hidden" id="vipGemsModal">
       <div class="modalCard" style="text-align: center">
         <img class="uiIcon" src="assets/ui/supernova.png" alt="" style="width:64px;height:64px;margin:0 auto 10px;display:block;" />
@@ -668,12 +602,7 @@
       </div>
     </div>
 
-    <!-- "Clicker automatique" first-time guide (Loris: "je pense que ce
-     serait efficace d'avoir un pop up qui se déclenche pour proposer et
-     guider le joueur à utiliser cette fonctionnalité pour la première
-     fois"). Opens once ever, the moment fabAutoClicker first becomes
-     visible - see openAutoClickerIntroModal() (ui.js). "Choisir ma case"
-     leads straight into the same cell-picker as tapping the fab itself. -->
+    <!-- Auto-clicker intro, shown once when fabAutoClicker first appears (openAutoClickerIntroModal, ui.js). -->
     <div class="modalOverlay hidden" id="autoClickerIntroModal">
       <div class="modalCard" style="text-align: center">
         <img class="uiIcon" src="assets/ui/boost.png" alt="" style="width:64px;height:64px;margin:0 auto 10px;display:block;" />

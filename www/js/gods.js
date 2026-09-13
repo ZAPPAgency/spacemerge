@@ -65,17 +65,8 @@ function describeGodEffect(god, level) {
 }
 function isGodUnlocked(state, godId) { return state.gods.unlockedIds.includes(godId); }
 
-// Loris: "il n'y a pas de pop up quand on débloque un nouveau dieu hormis
-// pour les deux premiers" - a plain toast (2s, easy to miss mid-merge) was
-// the only feedback for every unlock except the moon-ritual pair, which get
-// the picker modal as their own reveal. Every unlock now queues a real
-// modal (Game.pendingGodReveals, consumed by maybeOpenGodRevealModal() in
-// ui.js/input.js at the next safe moment - same "queue now, show after the
-// current animation/modal settles" pattern as unlockEasterEgg/
-// Game.pendingGodRitual). `opts.silent` is for the two unlocks that already
-// have their own dedicated fanfare and would otherwise double up with this
-// one: the ritual pair (the picker modal opens right after) and the Cosmic
-// Box (openCosmicBoxRevealModal already shows the exact same portrait/name).
+// Queues an unlock modal (maybeOpenGodRevealModal, ui.js) shown at the next safe moment.
+// `opts.silent` skips it when the caller already has its own reveal (ritual picker, Cosmic Box).
 function unlockGod(state, godId, opts) {
   if (isGodUnlocked(state, godId)) return;
   state.gods.unlockedIds.push(godId);
@@ -84,15 +75,8 @@ function unlockGod(state, godId, opts) {
   Game.pendingGodReveals.push(godId);
 }
 
-// Loris: "4 easter eggs [...] débloquer 4 easter eggs pour recevoir une
-// récompense inédite [...] informer quand un easter egg est débloqué".
-// Returns null if `id` is already unlocked (or unknown) - the only signal
-// callers need to know whether to trigger the "found it" reveal (ui.js).
-// The 4th egg also unlocks the secret god Ananké right here, in the same
-// mutation, rather than leaving callers to separately notice the count
-// hit 4 - pushed directly (not via unlockGod() above) since that fires
-// its own toast/sound, which would collide with the dedicated grand-finale
-// reveal this triggers instead (openEggGrandRevealModal, ui.js).
+// Returns null if already unlocked or unknown. The last egg also unlocks the secret god
+// Ananké, pushed directly to avoid unlockGod()'s modal (openEggGrandRevealModal has its own).
 function unlockEasterEgg(state, id) {
   if (state.easterEggs.unlockedIds.includes(id)) return null;
   const egg = EASTER_EGGS.find(e => e.id === id);
@@ -105,12 +89,7 @@ function unlockEasterEgg(state, id) {
 
 // Milestone-type gods unlock themselves the moment their `check` passes -
 // same pattern as achievements. Called after every stat-changing event.
-// Also covers shop-type gods with an `altCheck` (a free alternate unlock
-// condition, config.js - e.g. "ou 10 Big Bang déclenchés") - their `altLabel`
-// was already shown to the player in the detail modal (ui.js), promising
-// this free path, but altCheck itself was never actually evaluated
-// anywhere: those gods could only ever be bought with Gems. Bug found
-// during a full-branch review, fix requested by Loris.
+// Also unlocks shop gods whose free `altCheck` condition passes.
 function checkGodMilestones(state) {
   GODS.forEach(g => {
     if (isGodUnlocked(state, g.id)) return;
@@ -123,14 +102,11 @@ function checkGodMilestones(state) {
 function onFusionForGods(state, newTier) {
   if (newTier === 2) {
     state.moonMergesThisRun += 1;
-    // Both ritual gods (Séléna, Zéphar) unlock together, so the picker modal
-    // that opens next render (openGodPickerModal, ui.js) shows an actual
-    // choice - un dieu bienveillant, un dieu déchu - instead of a single
-    // card that had nothing to choose between (Loris).
+    // Both ritual gods unlock together so the picker offers a real choice.
     if (state.moonMergesThisRun === MOON_MERGES_TO_CHOOSE_GOD && !state.gods.currentGodId) {
       unlockGod(state, "selena", { silent: true });
       unlockGod(state, "zephar", { silent: true });
-      Game.pendingGodRitual = true; // main loop opens the picker modal next render - that IS their reveal
+      Game.pendingGodRitual = true; // the picker modal is their reveal
     }
   }
 
@@ -141,11 +117,8 @@ function onFusionForGods(state, newTier) {
     if (state.gods.erebusStreak >= erebus.unlock.target) unlockGod(state, "erebus");
   }
 
-  // Morgorath challenge: reach the Universe tier without ever using a
-  // grid-shortcut shop item (Sauter une case / Échanger deux cases) this
-  // run. Fixed at UNIVERSE_TIER (config.js) - this is specifically about
-  // reaching Univers, not whatever the current top tier happens to be now
-  // that TIERS extends past it.
+  // Morgorath challenge: reach UNIVERSE_TIER (not the top tier) without using a
+  // grid-shortcut shop item this run.
   if (newTier === UNIVERSE_TIER && !state.gods.usedShortcutThisRun) {
     state.gods.morgorathChallengeCleared = true;
   }
@@ -161,11 +134,7 @@ function checkThanatosChallenge(state) {
 }
 
 // ---- Choosing / swapping gods ----
-// Loris: "il faudrait qu'on puisse changer de dieu en pleine partie, pas
-// besoin d'attendre le prochain big bang" - used to only apply immediately
-// for the very first pick, any later pick queued into nextGodId and only
-// took effect at the next Big Bang (applyPendingGodAtBigBang below). Now
-// every pick swaps currentGodId immediately, always.
+// Picking a god applies immediately, even mid-run.
 function chooseGod(state, godId) {
   if (!isGodUnlocked(state, godId)) return false;
   state.gods.currentGodId = godId;
@@ -220,33 +189,15 @@ function nextGodMilestoneHint(state) {
   };
   const best = candidates.slice().sort((a, b) => progressOf(b) - progressOf(a))[0];
   const pct = Math.min(99, Math.round(progressOf(best) * 100));
-  // godPortraitHtml (ui.js), not best.emoji directly (Loris: "il y a
-  // plusieurs écrans quand on fait un big bang ou c'est encore les emoji
-  // qui sont utilisés") - same real-portrait-as-a-teaser convention
-  // already used for locked gods everywhere else (Progression roadmap
-  // steps, etc.) instead of falling back to the plain glyph.
+  // Locked gods show their portrait as a teaser, not the emoji.
   return `Prochain Dieu en approche : ${godPortraitHtml(best, "inlineTierIcon")} ${best.name} (${pct}% - ${best.unlock.label})`;
 }
 
-// Cosmic Box: rolls any god weighted by rarity, regardless of that god's
-// normal unlock path (including the "box"-only gods, whose only path IS
-// this roll).
-// Loris: "dans les boites cosmiques on doit pouvoir gagner uniquement des
-// dieux qu'on possède pas, comme ça on enlève les doublons c'est moins
-// frustrant" - re-rolls the RARITY (not the god) until landing on one that
-// still has an unowned god, so the odds stay proportional to
-// BOX_RARITY_WEIGHTS among what's actually still obtainable, instead of
-// ever handing out a duplicate. "Et quand le joueur a tout les dieux, la
-// boite cosmique se transforme en une boite [...] de gemmes" - once
-// nothing is left to unlock, this becomes a pure Gems roll instead
-// (rollCosmicBoxGems, below).
+// Cosmic Box: rolls a god weighted by rarity, whatever its normal unlock path.
+// Only unowned gods can drop: the rarity is re-rolled until it has one, which keeps
+// BOX_RARITY_WEIGHTS proportional. Once every god is owned, the box grants Gems.
 function rollCosmicBox(state) {
-  // !g.secret: Ananké (config.js) must never drop from a box, AND must
-  // never block the "every god owned" gems-box transition below just
-  // because she personally isn't unlocked yet - a player who has all 13
-  // normal gods but hasn't found the 4 easter eggs should still see the
-  // box become a Gems roll, not silently keep rolling for a god they can
-  // never actually receive this way.
+  // Secret gods never drop and don't block the switch to Gems.
   const unownedGods = GODS.filter(g => !g.secret && !isGodUnlocked(state, g.id));
   if (unownedGods.length === 0) {
     return { duplicate: false, allGodsOwned: true, gems: rollCosmicBoxGems(state) };
@@ -264,14 +215,11 @@ function rollCosmicBox(state) {
     pool = unownedGods.filter(g => g.rarity === pickedRarity);
   }
   const god = pool[Math.floor(Math.random() * pool.length)];
-  unlockGod(state, god.id, { silent: true }); // openCosmicBoxRevealModal (ui.js) is this one's reveal
+  unlockGod(state, god.id, { silent: true }); // openCosmicBoxRevealModal (ui.js) is the reveal
   return { duplicate: false, god };
 }
 
-// Loris: "un montant de gemmes aléatoires qui peut aller jusqu'à 200 (très
-// faible chance, le joueur a plus de chance de recevoir moins que 100
-// gemmes)". Math.random() squared skews the roll toward the low end
-// instead of a flat/uniform one - P(≤100) ≈ 71%, P(>180) ≈ 5%.
+// Squaring Math.random() skews toward small amounts: P(<=100) ~71%, P(>180) ~5%.
 function rollCosmicBoxGems(state) {
   const amount = Math.max(10, Math.round(Math.pow(Math.random(), 2) * 200));
   return grantGems(state, amount);
