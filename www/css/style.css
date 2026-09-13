@@ -246,11 +246,11 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
    on whichever cell it's currently targeting, kept in sync every frame from
    tickAutoClicker() (input.js, a plain classList.toggle - simpler than
    threading a re-render hook through every place the grid can change).
-   .autoClickPulse is the brief flash on each actual tap-bonus grant,
-   throttled in JS to well below the real grant rate (Loris: "une animation
-   à chaque clic [...] pas trop agressif mais de quand même visible"). */
+   .autoClickPulse is the brief flash on each actual tap-bonus grant, one
+   per TAP_COOLDOWN_MS (150ms, config.js) - keep the duration within that so
+   each flash reaches its peak before the next one restarts it. */
 .cell.autoClickTarget{box-shadow:0 0 0 2px #22d3ee88, 0 0 14px 2px #22d3ee33 inset;}
-.cell.autoClickPulse{animation:autoClickPulse .5s ease-out;}
+.cell.autoClickPulse{animation:autoClickPulse .15s ease-out;}
 @keyframes autoClickPulse{
   0%{box-shadow:0 0 0 2px #22d3ee88, 0 0 0 0 #22d3ee66;}
   40%{box-shadow:0 0 0 2px #22d3eecc, 0 0 22px 8px #22d3ee55;}
