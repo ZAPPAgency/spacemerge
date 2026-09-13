@@ -1000,8 +1000,7 @@ function renderShopPanel() {
   const daysSinceFirst = daysBetween(state.firstPlayedDay, todayStr());
   const visibleProducts = IAP_CATALOG.filter(product => {
     if (product.startersOnly && daysSinceFirst > 2) return false;
-    if (product.id === "remove_ads" && state.iap.removeAds) return false;
-    if (product.id === "stardust_boost" && state.iap.stardustBoost) return false;
+    if (isOneTimeIapOwned(state, product.id)) return false;
     if (product.skinId && state.iap.ownedSkinPacks.includes(product.skinId)) return false;
     return true;
   });
@@ -1643,7 +1642,25 @@ function endTutorial() {
 }
 
 // ---------------- Offline modal ----------------
+// A second absence can land while the first one's gain is still on screen,
+// uncollected - most notably during "Doubler (pub)" itself: the native ad
+// takes focus, handing it back fires handleAppResume (main.js), and
+// onOfflineDouble reads Game.pendingOfflineGain only once the ad resolves.
+// Replacing the pending gain there swapped a whole night's earnings for the
+// ~30s the ad lasted, and then doubled THAT. So an uncollected gain is
+// added to, never overwritten: both spans were genuinely spent away.
 function openOfflineModal(gainInfo, spawnedCount) {
+  const pending = Game.pendingOfflineGain;
+  if (pending && !$("offlineModal").classList.contains("hidden")) {
+    gainInfo = {
+      elapsedMs: pending.elapsedMs + gainInfo.elapsedMs,
+      cappedMs: pending.cappedMs + gainInfo.cappedMs,
+      gain: pending.gain + gainInfo.gain,
+      wasCapped: pending.wasCapped || gainInfo.wasCapped,
+    };
+    spawnedCount += pending.spawnedCount || 0;
+  }
+  gainInfo.spawnedCount = spawnedCount;
   Game.pendingOfflineGain = gainInfo;
   const capNote = gainInfo.wasCapped ? ` (plafonné à ${offlineCapHours(Game.state)}h)` : "";
   const spawnNote = spawnedCount > 0 ? `\n${spawnedCount} case(s) remplie(s) automatiquement` : "";
@@ -2018,7 +2035,7 @@ let fusionPromoProductId = null;
 function openFusionPromoModal(kind) {
   const promo = FUSION_PROMOS[kind];
   const product = promo && IAP_CATALOG.find(p => p.id === promo.productId);
-  if (!product) return; // defensive - e.g. the offer expired/was already bought between the trigger and this firing
+  if (!product || isOneTimeIapOwned(Game.state, product.id)) return; // defensive - e.g. the offer was already bought between the trigger and this firing
   fusionPromoProductId = product.id;
   $("fusionPromoTitle").innerHTML = promo.icon
     ? `<img class="inlineCurrencyIcon" src="assets/ui/${promo.icon}" alt=""> ${promo.title}`

@@ -116,7 +116,7 @@ function buyRunUpgrade(state, key) {
   if (level >= branch.maxLevel) return { ok: false, reason: "max" };
   const cost = runUpgradeCost(key, level + 1);
   if (state.stardust < cost) return { ok: false, reason: "funds", cost };
-  state.stardust -= cost;
+  spendStardust(state, cost); // not a bare `-=`: spendStardust also feeds the "Dépense N Stardust" daily quests
   state.runUpgrades[key] += 1;
   return { ok: true, cost, newLevel: state.runUpgrades[key] };
 }
@@ -219,8 +219,12 @@ function performMerge(state, fromIdx, toIdx) {
   // Easter egg "Le Second Souffle" (Loris: "atteindre le tier 2 (deux case
   // de niveau 14 du tier de base qui fusionne)" - his own "tier" here means
   // this loop counter, `cycle`, not TIERS 1-14) - reaching a second loop
-  // for the first time.
-  const eggResult = newCycle >= 2 ? unlockEasterEgg(state, "second_loop") : null;
+  // for the first time. Loris counts loops from 1 ("tier de base" = his
+  // tier 1 = cycle 0), so his "tier 2" is exactly what merging two base
+  // Genèse produces: cycle 1. `>= 2` was off by one, and cycle 2 needs two
+  // cycle-1 Genèse, ~2^28 meteorites in a single run on a 30-cell grid -
+  // which made this egg, and the 4-egg challenge behind it, unreachable.
+  const eggResult = newCycle >= 1 ? unlockEasterEgg(state, "second_loop") : null;
 
   trackFusionEvent(state, newTier);
   return { newTier, newCycle, looped, gemBonus, eggResult };

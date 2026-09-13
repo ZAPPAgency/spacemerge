@@ -993,6 +993,10 @@ async function onBuyIAP(productId) {
   switch (productId) {
     case "remove_ads": state.iap.removeAds = true; break;
     case "starter_pack":
+      // Non-consumable: a repeat purchase must not stack another 500 Gems,
+      // 3 cells and 1h of clicker on top of the first.
+      if (state.iap.starterPack) break;
+      state.iap.starterPack = true;
       state.gems += 500; state.lifetime.gemsEarned += 500;
       { const locked = []; for (let i = 0; i < TOTAL; i++) if (!state.unlocked[i]) locked.push(i);
         for (let k = 0; k < 3 && locked.length; k++) { const pick = locked.splice(Math.floor(Math.random() * locked.length), 1)[0]; state.unlocked[pick] = true; state.extraUnlockedCount += 1; } }
@@ -1128,13 +1132,32 @@ function wireClickSound() {
 }
 
 // Tapping the dark backdrop closes whichever modal is open, same as its own
-// close/cancel button - except the first-god ritual, which is a mandatory
-// one-time choice with no close button at all by design.
+// close/cancel button. "Same as" has to mean running that button's handler,
+// not just hiding the overlay - a bare hide skipped real work:
+//   - godUnlockModal: closeGodUnlockModal drains the reveal queue, so a
+//     double unlock left the 2nd god stuck until some unrelated later merge.
+//   - confirmActionModal / fusionPromoModal / eggFinaleModal: their close
+//     handlers clear pending state (the queued action, the promo's product,
+//     the finale's still-running burst/sparkle nodes).
+// Modals without an entry here have nothing beyond the hide to do.
+// Never dismissable from the backdrop:
+//   - godRitualModal: a mandatory one-time choice with no close button.
+//   - offlineModal: only its two buttons pay the pending gain out, so a
+//     backdrop tap silently threw away the player's offline earnings.
+const MODAL_BACKDROP_LOCKED = new Set(["godRitualModal", "offlineModal"]);
 function wireModalBackdropClose() {
+  const closeHandlers = {
+    godUnlockModal: closeGodUnlockModal,
+    confirmActionModal: closeConfirmModal,
+    fusionPromoModal: closeFusionPromoModal,
+    eggFinaleModal: closeEggFinaleModal,
+  };
   document.addEventListener("click", (e) => {
-    if (e.target.classList.contains("modalOverlay") && e.target.id !== "godRitualModal") {
-      e.target.classList.add("hidden");
-    }
+    const overlay = e.target;
+    if (!overlay.classList.contains("modalOverlay") || MODAL_BACKDROP_LOCKED.has(overlay.id)) return;
+    const close = closeHandlers[overlay.id];
+    if (close) close();
+    else overlay.classList.add("hidden");
   });
 }
 
@@ -1170,7 +1193,11 @@ function wireEvents() {
   $("fabAutoClicker").addEventListener("click", onAutoClickerClick);
   $("autoClickerIntroPick").addEventListener("click", () => {
     $("autoClickerIntroModal").classList.add("hidden");
-    armAutoClickerPicker();
+    // Through onAutoClickerClick, not straight to armAutoClickerPicker: the
+    // intro only opens when the fab is first revealed, but the Boutique card
+    // can already have spent today's free use (or have one still running) by
+    // then - arming the picker directly handed out a second free 10 minutes.
+    onAutoClickerClick();
   });
   $("fabUnlockCellAd").addEventListener("click", onUnlockCellAd);
   dom.fabSwapCells.addEventListener("click", onSwapCellsClick);
