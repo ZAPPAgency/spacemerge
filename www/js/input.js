@@ -201,6 +201,11 @@ function handleLockedTap(idx) {
     if (result.ok) {
       renderCell(idx, { justUnlocked: true }); // layer the unlock-pop animation on top of the plain renderAll() paint
       triggerResonanceIfLucky(state);
+      // Résonance bumps extraUnlockedCount, i.e. unlockCost() for every cell
+      // still locked - and it fires AFTER the renderAll() above, so without
+      // this they keep advertising the old, cheaper price. Same call the
+      // other two unlock paths already make (tryUnlock, onUnlockCellAd).
+      refreshLockedCellPrices();
     }
     saveState(state);
     return;
