@@ -928,6 +928,11 @@ function onBuyGemItem(itemId) {
     if (Game.state.gems < SHOP_GEM_ITEMS.find(i => i.id === "swapCells").cost) { Sfx.error(); toast("Pas assez de Gems."); return; }
     Game.swapArmed = true;
     Game.swapFirstIdx = null;
+    // This entry point is the PAID swap. swapFree is only cleared when a swap
+    // actually completes (handleSwapTap), so an ad-earned free swap that was
+    // armed and then abandoned would still be flagged free here and hand out
+    // this purchase for nothing.
+    Game.swapFree = false;
     closePanel();
     toast("Choisis deux cases à échanger.");
     renderAll();
