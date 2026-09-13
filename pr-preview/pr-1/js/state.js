@@ -192,11 +192,28 @@ function loadState() {
     if (data.version !== SAVE_VERSION) return defaultState();
     // fill any missing fields added by later updates (defensive against partial saves)
     const fresh = defaultState();
-    return deepFill(data, fresh);
+    return migrateRetiredFields(deepFill(data, fresh));
   } catch (e) {
     console.warn("Save corrompue, nouvelle partie.", e);
     return defaultState();
   }
+}
+
+// deepFill() only ADDS fields; a field a later update stopped reading just
+// sits in the save doing nothing. This carries over the meaning of those
+// retired fields instead of silently dropping it. Run on every load path -
+// loadState() above and the native Preferences load (native-bridge.js).
+function migrateRetiredFields(state) {
+  // gods.nextGodId: a god picked mid-run used to wait here and only become
+  // current at the next Big Bang/restart. Picks now apply immediately and
+  // nothing reads this any more, so a player who had one queued would have
+  // kept their old god after that Big Bang, with no message. Apply it now.
+  const gods = state.gods;
+  if (gods && gods.nextGodId !== undefined) {
+    if (gods.nextGodId && gods.unlockedIds.includes(gods.nextGodId)) gods.currentGodId = gods.nextGodId;
+    delete gods.nextGodId;
+  }
+  return state;
 }
 
 function deepFill(data, fresh) {

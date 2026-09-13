@@ -68,7 +68,7 @@ async function bootNative() {
       // A previous native save exists and differs from the localStorage bootstrap
       // (e.g. first run after this bridge was added) - prefer it.
       const migrated = JSON.parse(value);
-      if (migrated && migrated.version === SAVE_VERSION) Object.assign(Game.state, migrated);
+      if (migrated && migrated.version === SAVE_VERSION) Object.assign(Game.state, migrateRetiredFields(migrated));
     }
   } catch (e) { console.warn("Lecture Preferences impossible", e); }
 

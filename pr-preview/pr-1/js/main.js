@@ -63,6 +63,10 @@ function requestStorageAccessBestEffort() {
     // (armAutoClickerPicker/handleAutoClickerPick, input.js) - same
     // in-memory, tap-only-mode pattern as swapArmed/skipCellArmed above.
     autoClickerArmed: false,
+    // An ad was watched for the next auto-clicker activation but no cell has
+    // been picked yet (onAutoClickerClick, input.js) - lets a cancelled picker
+    // be reopened without watching another ad.
+    autoClickerPaid: false,
     // Queued god ids awaiting their unlock-reveal modal (Loris: "il n'y a
     // pas de pop up quand on débloque un nouveau dieu hormis pour les deux
     // premiers") - unlockGod() (gods.js) pushes here, maybeOpenGodRevealModal()
