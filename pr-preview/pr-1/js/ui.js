@@ -340,6 +340,7 @@ function renderAll() {
 let lastHeaderRender = {};
 function updateHeader() {
   const state = Game.state;
+  const now = Date.now();
   const stardustStr = formatNumber(Game.displayedStardust);
   if (stardustStr !== lastHeaderRender.stardust) { dom.stardustValue.textContent = stardustStr; lastHeaderRender.stardust = stardustStr; }
 
@@ -356,14 +357,28 @@ function updateHeader() {
   const costStr = formatNumber(cost);
   if (costStr !== lastHeaderRender.cost) { dom.invokeCost.textContent = costStr; lastHeaderRender.cost = costStr; }
   if (!lastHeaderRender.gemsCostSet) { $("invokeCostGems").textContent = GEMS_INVOKE_COST; lastHeaderRender.gemsCostSet = true; }
-  if (!lastHeaderRender.swapCostSet) { $("swapCellsCost").textContent = SHOP_GEM_ITEMS.find(i => i.id === "swapCells").cost; lastHeaderRender.swapCostSet = true; }
   const disabled = state.stardust < cost;
   if (disabled !== lastHeaderRender.disabled) { dom.invokeBtnStardust.classList.toggle("disabled", disabled); lastHeaderRender.disabled = disabled; }
   const gemsDisabled = state.gems < GEMS_INVOKE_COST;
   if (gemsDisabled !== lastHeaderRender.gemsDisabled) { dom.invokeBtnGems.classList.toggle("disabled", gemsDisabled); lastHeaderRender.gemsDisabled = gemsDisabled; }
+  // "Pas assez de Gems" is deliberately NOT a disabled state any more: it is
+  // exactly the case onSwapCellsClick (input.js) turns into the "regarder une
+  // pub pour échanger gratuitement" offer, so greying the button out made
+  // that offer look unusable and left it undiscoverable. The button now
+  // advertises the ad path instead (same watch-ad.png treatment as the
+  // Clicker Auto / +Gems fabs below), and only greys out when it really can't
+  // be used: mid-selection, or with that ad fallback still on cooldown.
   const swapCost = SHOP_GEM_ITEMS.find(i => i.id === "swapCells").cost;
-  const swapDisabled = state.gems < swapCost || Game.swapArmed;
+  const swapAffordable = state.gems >= swapCost;
+  const swapAdLeft = state.cooldowns.swapAdUntil - now;
+  const swapAdOnCooldown = !swapAffordable && swapAdLeft > 0;
+  const swapDisabled = Game.swapArmed || swapAdOnCooldown;
   if (swapDisabled !== lastHeaderRender.swapDisabled) { dom.fabSwapCells.classList.toggle("disabled", swapDisabled); lastHeaderRender.swapDisabled = swapDisabled; }
+  const swapLabel = swapAffordable
+    ? `<img class="inlineCurrencyIcon" src="assets/ui/gems_ad.png" alt="Gems">${swapCost}`
+    : (swapAdOnCooldown ? formatDuration(swapAdLeft)
+      : `<img class="inlineCurrencyIcon" src="assets/ui/watch-ad.png" alt="">Gratuit`);
+  if (swapLabel !== lastHeaderRender.swapLabel) { dom.fabSwapCells.innerHTML = swapLabel; lastHeaderRender.swapLabel = swapLabel; }
 
   const canBB = hasUniverseTile(state);
   if (canBB !== lastHeaderRender.canBB) { dom.bigBangBtn.classList.toggle("hidden", !canBB); lastHeaderRender.canBB = canBB; }

@@ -8,8 +8,15 @@
 // a fixed reference instead of "whatever the current ceiling is" - reaching
 // Univers or anything higher keeps Big Bang available for the rest of the
 // run, however far past it the player pushes.
+//
+// Compared against tileProgressTier() (config.js), not the raw t.tier: the
+// infinite loop added by performMerge() below sends a tile's tier back to 1
+// while bumping `cycle`, so a player whose only high tiles were two Genèse
+// (tier 14) saw the Big Bang button vanish the moment they merged them - the
+// exact already-earned-eligibility revocation described above, reappearing
+// at the loop boundary.
 function hasUniverseTile(state) {
-  return state.grid.some(t => t && t.tier >= UNIVERSE_TIER);
+  return state.grid.some(t => t && tileProgressTier(t) >= UNIVERSE_TIER);
 }
 // "Surcharge du Big Bang" run upgrade (RUN_UPGRADE_TREE, config.js) applies
 // here rather than inside the pure bigBangGain() formula (config.js) so
@@ -244,10 +251,20 @@ function equipCosmetic(state, id) {
 // call site) means both the free and the ad-gated reactivation path can
 // call this one function - by the time either reaches here, today's free
 // use is spent either way.
-function activateAutoClicker(state, targetIdx) {
+//
+// `opts.keepFreeDaily` opts out of that, for the one caller where the
+// assumption doesn't hold: the paid starter pack (onBuyIAP, input.js), which
+// grants a clicker window as part of the purchase. Consuming the day's free
+// activation there meant a player who bought the pack before using it lost
+// it outright - once the paid hour expired they were told to watch an ad for
+// a free daily use they had never had.
+// `opts.durationMs` likewise lets that purchase grant its own longer window
+// instead of overwriting activeUntil right after this call.
+function activateAutoClicker(state, targetIdx, opts) {
+  const durationMs = (opts && opts.durationMs) || AUTO_CLICKER_DURATION_MS;
   state.autoClicker.targetIdx = targetIdx;
-  state.autoClicker.activeUntil = Date.now() + AUTO_CLICKER_DURATION_MS;
-  state.autoClicker.freeUsedDate = todayStr();
+  state.autoClicker.activeUntil = Date.now() + durationMs;
+  if (!(opts && opts.keepFreeDaily)) state.autoClicker.freeUsedDate = todayStr();
 }
 function isAutoClickerFreeAvailable(state) {
   return state.autoClicker.freeUsedDate !== todayStr();

@@ -334,21 +334,36 @@ function maybeOpenFusionPromo() {
   setTimeout(() => openFusionPromoModal(kind), 700);
 }
 
-function grantTapBonus(idx) {
+// `opts.auto` marks a tap the PLAYER did not make - the auto-clicker's own
+// per-frame tick (tickAutoClicker below). The Stardust, the quest progress
+// and the floating number are identical either way; what an automated tap
+// must NOT do is:
+//   - reset the Erebus streak. That challenge is "fusionne 35 fois d'affilée
+//     sans jamais appuyer sur une case" - appuyer, i.e. the player pressing.
+//     Letting the clicker reset it made the challenge unprogressable during
+//     the very feature the game tells every player to claim daily.
+//   - play Sfx.tap() and saveState() at the clicker's cadence. At
+//     TAP_COOLDOWN_MS = 150ms that's ~6-7 tap beeps per second and ~6-7 full
+//     JSON.stringify + localStorage writes per second, for 10 minutes
+//     straight. The main loop already saves every tick (~1s, main.js), so
+//     nothing is lost; the sound is instead played by tickAutoClicker on the
+//     same throttle as the visual pulse.
+function grantTapBonus(idx, opts) {
   const now = performance.now();
   if (Game.cooldownUntil[idx] > now) return false;
   const state = Game.state;
   const tile = state.grid[idx];
   if (!tile) return false;
+  const auto = opts && opts.auto;
   const bonus = 5 * effectiveTileProd(state, tile.tier);
   grantStardust(state, bonus);
   updateQuestProgress(state, "tapBonuses", 1);
-  resetErebusStreak(state);
+  if (!auto) resetErebusStreak(state);
   Game.cooldownUntil[idx] = now + TAP_COOLDOWN_MS;
-  Sfx.tap();
+  if (!auto) Sfx.tap();
   spawnFloatingBonus(idx, bonus);
   updateHeader();
-  saveState(state);
+  if (!auto) saveState(state);
   return true;
 }
 
@@ -657,29 +672,31 @@ function spinVisual(prizeIndex, cb) {
   scheduleWheelTicks(WHEEL_SPIN_MS);
   setTimeout(cb, WHEEL_SPIN_MS);
 }
+// Shared landing step for both spins below - renderAll() rather than just
+// updateHeader/updateFabs because the "1 case débloquée" prize (WHEEL_PRIZES,
+// retention.js) mutates state.unlocked. Without a grid re-render the cell the
+// player just won kept drawing as locked, at its old price, until some
+// unrelated action happened to redraw it - and tapping it went straight to
+// handleTap, silently "selecting" a cell that still looked locked. Same
+// reason onDailyClaim() calls renderAll() for this very reward type.
+function finishWheelSpin(prize) {
+  $("wheelResult").innerHTML = prize ? `Gagné : ${withCurrencyIcons(prize.label)}` : "Déjà utilisé aujourd'hui.";
+  Sfx.wheelWin();
+  refreshWheelButtons();
+  renderAll();
+  saveState(Game.state);
+}
 function onWheelSpinFree() {
   $("wheelSpinFree").disabled = true; $("wheelSpinAd").disabled = true;
   const prize = spinWheel(Game.state, false);
-  spinVisual(prize ? WHEEL_PRIZES.indexOf(prize) : 0, () => {
-    $("wheelResult").innerHTML = prize ? `Gagné : ${withCurrencyIcons(prize.label)}` : "Déjà utilisé aujourd'hui.";
-    Sfx.wheelWin();
-    refreshWheelButtons();
-    updateHeader(); updateFabs();
-    saveState(Game.state);
-  });
+  spinVisual(prize ? WHEEL_PRIZES.indexOf(prize) : 0, () => finishWheelSpin(prize));
 }
 async function onWheelSpinAd() {
   $("wheelSpinFree").disabled = true; $("wheelSpinAd").disabled = true;
   const ok = await watchRewardedAd(Game.state, "wheel_bonus");
   if (!ok) { refreshWheelButtons(); return; }
   const prize = spinWheel(Game.state, true);
-  spinVisual(prize ? WHEEL_PRIZES.indexOf(prize) : 0, () => {
-    $("wheelResult").innerHTML = prize ? `Gagné : ${withCurrencyIcons(prize.label)}` : "Déjà utilisé aujourd'hui.";
-    Sfx.wheelWin();
-    refreshWheelButtons();
-    updateHeader(); updateFabs();
-    saveState(Game.state);
-  });
+  spinVisual(prize ? WHEEL_PRIZES.indexOf(prize) : 0, () => finishWheelSpin(prize));
 }
 
 // ---------------- Unlock cell fab (rewarded ad) ----------------
@@ -812,9 +829,11 @@ function handleAutoClickerPick(idx) {
 // gates itself on the cell's own TAP_COOLDOWN_MS via Game.cooldownUntil, so
 // this can just call it every frame without any extra throttling of its
 // own - it silently no-ops between real ticks. The visual pulse
-// (playAutoClickEffect) is throttled separately, well below that cadence
-// (Loris: "pas trop agressif mais de quand même visible") - the underlying
-// Stardust grants stay fast, only the on-screen flash is calmed down.
+// (playAutoClickEffect) AND the tap sound are throttled together, well below
+// that cadence (Loris: "pas trop agressif mais de quand même visible") - the
+// underlying Stardust grants stay fast, only the feedback is calmed down.
+// `{ auto: true }` also keeps grantTapBonus from resetting the Erebus streak
+// or saving on every single fire - see its comment above.
 let autoClickerLastPulseAt = 0;
 const AUTO_CLICKER_PULSE_MIN_GAP_MS = 900;
 function tickAutoClicker() {
@@ -825,9 +844,10 @@ function tickAutoClicker() {
   if (idx !== null && cellEls[idx]) cellEls[idx].classList.toggle("autoClickTarget", isActive);
   if (!isActive || !state.grid[idx]) return; // inactive, or paused - the target cell is currently empty
   const now = performance.now();
-  const fired = grantTapBonus(idx);
+  const fired = grantTapBonus(idx, { auto: true });
   if (fired && now - autoClickerLastPulseAt >= AUTO_CLICKER_PULSE_MIN_GAP_MS) {
     autoClickerLastPulseAt = now;
+    Sfx.tap();
     playAutoClickEffect(idx);
   }
 }
@@ -958,10 +978,12 @@ async function onBuyIAP(productId) {
       // (activateAutoClicker, economy.js) grants an equivalent 1h here,
       // auto-targeting the player's own highest-tier occupied cell since
       // this grant is programmatic, not player-picked like every other
-      // activation of this feature.
+      // activation of this feature. keepFreeDaily: this is bought content on
+      // top of the daily allowance, not a spend of it - without it, buying
+      // the pack before using today's free clicker silently burned it.
       { let bestIdx = null, bestTier = 0;
         for (let i = 0; i < TOTAL; i++) { const t = state.grid[i]; if (t && t.tier > bestTier) { bestTier = t.tier; bestIdx = i; } }
-        if (bestIdx !== null) { activateAutoClicker(state, bestIdx); state.autoClicker.activeUntil = Date.now() + 3600000; } }
+        if (bestIdx !== null) activateAutoClicker(state, bestIdx, { durationMs: 3600000, keepFreeDaily: true }); }
       break;
     case "gems_small": case "gems_medium": case "gems_large": case "gems_mega":
       state.gems += product.amount; state.lifetime.gemsEarned += product.amount; break;
