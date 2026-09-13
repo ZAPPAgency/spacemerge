@@ -43,9 +43,6 @@ function buildGridDom() {
   }
 }
 
-// The ambiance (background color skin) cosmetic slot was removed entirely
-// per Loris' request - only the emoji-set slot (Fruits/Légumes vs classic)
-// remains, so every tile always uses its own TIERS from/to gradient now.
 function equippedEmojiSetDef() { return EMOJI_SETS.find(e => e.id === Game.state.equippedEmojiSet) || EMOJI_SETS[0]; }
 function tierStyle(tier) {
   const t = TIERS[tier - 1];
@@ -54,20 +51,10 @@ function tierStyle(tier) {
 function tierEmoji(tier) { const s = equippedEmojiSetDef(); return (s.tierSkin && s.tierSkin[tier - 1]) ? s.tierSkin[tier - 1].emoji : TIERS[tier - 1].emoji; }
 function tierName(tier) { const s = equippedEmojiSetDef(); return (s.tierSkin && s.tierSkin[tier - 1]) ? s.tierSkin[tier - 1].name : TIERS[tier - 1].name; }
 
-// ---------------- Cycle glow (infinite loop past the top tier) ----------------
-// Loris: "un effet lumineux d'une couleur choisie pour ce nouveau palier
-// (la couleur évolue selon le niveau des cases mais se mélange aussi avec
-// la couleur du tier) et animé sur la case [...] les tiers apportent un
-// effet animé constant sur les cases et un effet lumineux, la couleur
-// change en fonction des tiers" - "tier"/"palier" here means the new loop
-// counter (tile.cycle, performMerge in economy.js), not the existing
-// TIERS 1-14 - kept as a separate name in code to avoid colliding with
-// that. Each cycle gets its own hue (rotating through the wheel so
-// consecutive cycles read as clearly different colors); within a cycle,
-// the glow's intensity grows with the tile's own tier (1-14) - blending
-// "how far into this loop" with "which loop" as asked.
+// ---------------- Cycle glow (loops past the top tier) ----------------
+// Each cycle (tile.cycle) gets its own hue; the glow gets stronger with the tile's tier.
 function cycleColor(cycle) {
-  const hue = ((cycle - 1) * 47) % 360; // 47: spreads hues well before any two cycles look alike
+  const hue = ((cycle - 1) * 47) % 360; // 47° apart so consecutive cycles look clearly different
   return `hsl(${hue}, 75%, 60%)`;
 }
 function applyCycleGlow(tile, tier, cycle) {
@@ -77,13 +64,7 @@ function applyCycleGlow(tile, tier, cycle) {
   tile.style.setProperty("--cycle-intensity", (tier / TIERS.length).toFixed(2));
 }
 
-// Small inline <img> for tier references OUTSIDE the grid itself (the
-// tutorial, stat lines, the Big Bang summary...) so illustrated tiers read
-// consistently everywhere they're mentioned, not just on the board itself -
-// these spots were still hardcoding the plain emoji glyph even after a
-// tier got custom art. Always the classic set's own icon (these are
-// generic "tier N" references, not tied to whichever skin is equipped) -
-// falls back to the plain emoji for any tier without art yet.
+// Inline tier icon for text outside the grid. Always the classic set's art, emoji fallback.
 function tierInlineIconHtml(tier) {
   const t = TIERS[tier - 1];
   return t.icon
@@ -91,17 +72,8 @@ function tierInlineIconHtml(tier) {
     : t.emoji;
 }
 
-// Same "custom art with an emoji fallback" pattern as tierInlineIconHtml()
-// above, for the 13 GODS portraits (assets/gods/, Midjourney). `cls` picks
-// the sizing rule from style.css - every god-emoji spot in the UI (Gods
-// panel grid, detail modal, ritual picker, Histoire god-lore card, Cosmic
-// Box reveal) has its own size, so this doesn't hardcode one. `locked`
-// (default false) shows the shared "unknown god" illustration
-// (assets/gods/unknown-v2.png, Loris - redone with a cleaner cutout than
-// the first pass, renamed rather than overwritten to dodge stale image
-// caching on returning players' devices) instead of the real portrait -
-// reuses the same `cls` sizing rule as the real art so it drops into every
-// one of those spots at the right size with no extra CSS.
+// God portrait with emoji fallback. `cls` is the CSS size class of the spot using it.
+// `locked` shows the shared "unknown god" image instead.
 function godPortraitHtml(god, cls, locked) {
   if (locked) return `<img class="${cls}" src="assets/gods/unknown-v2.png" alt="Dieu inconnu">`;
   return god.icon
@@ -109,13 +81,7 @@ function godPortraitHtml(god, cls, locked) {
     : god.emoji;
 }
 
-// Same idea for the Gems/Cosmic Energy currency glyphs (Loris: the fab
-// icon batch replaced 💎/⚡ on the "Pub contre Gems"/"Ascension" buttons
-// themselves, but every OTHER place those currencies are shown - header
-// pills, shop prices, the Gems menu title, skill costs - still used the
-// plain emoji). Reuses the same artwork (gems_ad.png/ascension.png) as
-// small inline glyphs rather than commissioning separate icons - at
-// 14-16px next to a number they read fine as the currency symbol.
+// Inline currency icon next to a number.
 function currencyIconHtml(type) {
   if (type === "stardust") return `<img class="inlineCurrencyIcon" src="assets/ui/stardust.png" alt="Stardust">`;
   if (type === "gems") return `<img class="inlineCurrencyIcon" src="assets/ui/gems_ad.png" alt="Gems">`;
@@ -123,10 +89,7 @@ function currencyIconHtml(type) {
   return "";
 }
 
-// "#3a3550" -> "58, 53, 80" - lets style.css plug a TIERS[].from/to color
-// straight into rgba(var(--x), a) / rgb(var(--x)) without baking a fixed
-// alpha in JS. Used by playMeteorMerge() to make the merge impact effect
-// (burst rays, ring, debris, flash) match the landed tile's own colors.
+// "#3a3550" -> "58, 53, 80", for rgba(var(--x), a) in CSS.
 function hexRgbTriplet(hex) {
   const h = hex.replace("#", "");
   const r = parseInt(h.substring(0, 2), 16);
@@ -135,12 +98,6 @@ function hexRgbTriplet(hex) {
   return `${r}, ${g}, ${b}`;
 }
 
-// Reward labels in config.js (DAILY_LOGIN_REWARDS) and retention.js
-// (WHEEL_PRIZES) are plain strings with the emoji baked in ("100 ✨",
-// "20 💎"...) - both files load BEFORE this one, so they can't call
-// currencyIconHtml() themselves. Swapping the glyphs at render time here
-// instead handles every such label generically, without touching each
-// config entry individually.
 function lockIconHtml() { return `<img class="inlineCurrencyIcon" src="assets/ui/cadenas.png" alt="">`; }
 function trophyIconHtml() { return `<img class="inlineCurrencyIcon" src="assets/ui/succes.png" alt="">`; }
 
@@ -151,34 +108,19 @@ function withCurrencyIcons(text) {
     .replace(/⚡/g, currencyIconHtml("energy"));
 }
 
-// Builds the tile's icon element: custom artwork when the active skin
-// (classic, or a tierSkin-based one like Fruits/Légumes) has an `icon` for
-// this tier, otherwise the plain emoji glyph. Classic reads icon/iconScale
-// straight off TIERS[tier-1]; a tierSkin-based skin reads them off its own
-// tierSkin[tier-1] entry instead, so Fruits/Légumes can get their own art
-// independently of (and without needing) the classic set's.
-// `setOverride` (optional): render as if THIS set were equipped instead of
-// the real equipped one - used by the shop's skin preview modal (see
-// openSkinPreviewModal) to show a set's tiles without actually equipping it.
+// Tile icon: artwork from the set's tierSkin entry (or TIERS for classic), else the emoji.
+// `setOverride` renders another set without equipping it (skin preview).
 function tierIconNode(tier, setOverride) {
   const s = setOverride || equippedEmojiSetDef();
   const skinEntry = s.tierSkin && s.tierSkin[tier - 1];
   const src = skinEntry || TIERS[tier - 1];
-  // Emoji/Illustré switch (Loris) - a set with no art for this tier yet
-  // (Fruits/Légumes today) just falls through to the emoji branch below
-  // regardless of iconStyle, same as before this switch existed.
+  // Falls back to the emoji when the set has no art for this tier.
   if (src.icon && Game.state.iconStyle !== "emoji") {
     const img = document.createElement("img");
     img.className = "emoji tierIcon";
     img.src = "assets/tiles/" + src.icon;
     img.alt = src.name;
-    // Per-tier size correction (optional): some source art reads smaller
-    // than others at the same box size - either because the image itself
-    // is a non-square aspect ratio (object-fit:contain then sizes to the
-    // limiting dimension) or because the visible "mass" of the subject
-    // (e.g. a glow with thin rays reaching the edges) is smaller than its
-    // full bounding box. Overrides the CSS .tierIcon default inline, since
-    // inline beats the class rule.
+    // iconScale enlarges art that reads small; inline size overrides the .tierIcon CSS rule.
     if (src.iconScale) {
       const pct = (68 * src.iconScale).toFixed(1) + "%";
       img.style.width = pct; img.style.height = pct;
@@ -187,11 +129,7 @@ function tierIconNode(tier, setOverride) {
   }
   const span = document.createElement("div");
   span.className = "emoji";
-  // `src` here is already resolved against `setOverride` (see above) - using
-  // tierEmoji(tier) instead would silently ignore setOverride and re-read
-  // the REAL equipped set, which is exactly the bug that made the skin
-  // preview modal (openSkinPreviewModal) show the classic set's emoji for
-  // every tier of a Fruits/Légumes preview instead of that set's own.
+  // Use `src.emoji`, not tierEmoji(): tierEmoji ignores setOverride.
   span.textContent = src.emoji;
   return span;
 }
@@ -222,10 +160,7 @@ function renderCell(i, opts) {
 
   if (!tileData) {
     cell.classList.add("empty");
-    // One-shot "just unlocked" pop (Loris) - passed explicitly by the
-    // unlock call sites (tryUnlock/onUnlockCellAd in input.js) right after
-    // a locked cell becomes available, not on every re-render of an
-    // already-empty cell.
+    // Pop animation only right after an unlock, not on every re-render.
     if (opts.justUnlocked) cell.classList.add("unlockPop");
     if (Game.selectedIdx === i) cell.classList.add("selectableEmpty");
     return;
@@ -233,11 +168,7 @@ function renderCell(i, opts) {
 
   cell.classList.add("filled");
   if (Game.selectedIdx === i) cell.classList.add("selected");
-  // Continuous idle animation on the max tier (Loris) - a slow glow pulse
-  // on the cell + a gentle breathing scale on the icon (see .cell.tierMax
-  // in style.css). On the .cell rather than .tile so it never fights with
-  // .tile.merging/.tile.spawnIn's own transform animations on a fresh max
-  // tier (different element = no property conflict either way).
+  // Idle animation on max-tier tiles. On .cell, not .tile, to avoid clashing with merge/spawn transforms.
   if (tileData.tier === TIERS.length) cell.classList.add("tierMax");
 
   const tile = document.createElement("div");
@@ -261,35 +192,15 @@ function renderCell(i, opts) {
   cell.appendChild(tile);
 }
 
-// Renders a static (but gently, continuously animated) 10-tile preview grid
-// for `setId`, without touching state.equippedEmojiSet - see the "Aperçu"
-// button in renderCosmeticGrid(). Reuses the real .cell/.tile markup and
-// tierStyle() background so it looks exactly like the actual game grid.
-// Emoji/Illustré switch - shared between the skin manager popup and this
-// preview modal (Loris: it's a display preference, belongs in skin
-// management, not the shop - and the preview specifically should let you
-// see/pick between the two modes right there). `onChange` re-renders
-// whichever container the toggle lives in, so the effect is visible
-// immediately without closing anything.
-// `set` (optional): which set's tier-1 to demonstrate the two styles with -
-// defaults to whatever's actually equipped. Bug (Loris: "il y a encore la
-// météorite emoji et la météorite illustrée... dans le mode gestion de
-// skin et dans l'aperçu et dans la boutique"): this always showed the
-// classic Météorite regardless of context, so previewing Fruits/Légumes
-// (via "Aperçu", reachable from both the Boutique and the skin manager -
-// same modal, same bug) still demonstrated the toggle with an unrelated
-// meteorite instead of that set's own tier 1. openSkinPreviewModal now
-// passes the set actually being previewed; openSkinManagerModal (no one
-// specific set on screen there) still falls back to whatever's equipped.
+// Emoji/Illustrated toggle, used by the skin manager and the skin preview.
+// `onChange` re-renders the host container. `set` picks which set's tier 1 illustrates
+// the two buttons (defaults to the equipped set).
 function renderIconStyleToggle(onChange, set) {
   const state = Game.state;
   const wrap = el("div", "iconStyleToggle");
   const s = set || equippedEmojiSetDef();
   const skin = (s.tierSkin && s.tierSkin[0]) || TIERS[0];
-  // Falls back to the classic meteorite's own art if this set has none yet
-  // for tier 1 (e.g. Légumes before its icons exist) - still a real
-  // "Illustré" example, just not from this specific set, better than a
-  // broken image.
+  // Falls back to the classic meteorite art if this set has no tier 1 art.
   const artSrc = skin.icon || TIERS[0].icon;
   const emojiBtn = el("button", "btn" + (state.iconStyle === "emoji" ? " primary" : " ghost"),
     `<span class="emoji">${skin.emoji}</span> Emoji`);
@@ -361,13 +272,8 @@ function updateHeader() {
   if (disabled !== lastHeaderRender.disabled) { dom.invokeBtnStardust.classList.toggle("disabled", disabled); lastHeaderRender.disabled = disabled; }
   const gemsDisabled = state.gems < GEMS_INVOKE_COST;
   if (gemsDisabled !== lastHeaderRender.gemsDisabled) { dom.invokeBtnGems.classList.toggle("disabled", gemsDisabled); lastHeaderRender.gemsDisabled = gemsDisabled; }
-  // "Pas assez de Gems" is deliberately NOT a disabled state any more: it is
-  // exactly the case onSwapCellsClick (input.js) turns into the "regarder une
-  // pub pour échanger gratuitement" offer, so greying the button out made
-  // that offer look unusable and left it undiscoverable. The button now
-  // advertises the ad path instead (same watch-ad.png treatment as the
-  // Clicker Auto / +Gems fabs below), and only greys out when it really can't
-  // be used: mid-selection, or with that ad fallback still on cooldown.
+  // Not disabled when Gems are short: the button then offers a free swap with an ad.
+  // Disabled only during a swap selection or while that ad is on cooldown.
   const swapCost = SHOP_GEM_ITEMS.find(i => i.id === "swapCells").cost;
   const swapAffordable = state.gems >= swapCost;
   const swapAdLeft = state.cooldowns.swapAdUntil - now;
@@ -392,24 +298,8 @@ function updateHeader() {
   if (hint !== lastHeaderRender.hint) { dom.selectionHint.textContent = hint; lastHeaderRender.hint = hint; }
 }
 
-// Loris: "je pense que le bouton boost x2 et case gratuite et 10 gems [...]
-// devrait apparaître petit à petit lors des premières fusions [...] alchimie
-// et cadeau et [le fab dieu] je pense qu'ils devraient aussi apparaître
-// petit à petit" - a fresh save now starts every one of these fabs hidden
-// (index.html) and they trickle in here, gated on state.lifetime.fusions
-// (persists across Big Bangs, never resets - a one-time onboarding trickle,
-// not something that re-hides later).
-//
-// Order revised after a second round of feedback - Loris: "c'est le bouton
-// cadeau qui devrait apparaître en premier [...] le bouton boost apparait
-// en même temps que le choix des dieux ce qui est mauvais [...] l'ordre
-// serait : Cadeau -> Dieux choisi (4 lunes fusionnées) -> Alchimie -> Case
-// gratuite -> Boost x2 -> +10 Gems". fabCurrentGod isn't in this table - it
-// already only exists once a god is equipped, itself gated by 4 fusions
-// that each produce a tier-2 tile (MOON_MERGES_TO_CHOOSE_GOD, gods.js) -
-// which, since almost every early fusion IS a tier-1-into-tier-2 one, lands
-// well before fabRunUpgrades' own threshold in normal play. fabCurrentGod
-// just gets the same reveal animation the first time it appears.
+// Fabs appear one by one as lifetime fusions grow (onboarding, never hidden again).
+// fabCurrentGod is not listed: it appears with the first god (moon ritual).
 const FAB_DISCOVERY_FUSIONS = {
   fabDailyLogin: 1,
   fabRunUpgrades: 6,
@@ -417,14 +307,8 @@ const FAB_DISCOVERY_FUSIONS = {
   fabAutoClicker: 12,
   fabGemsAd: 15,
 };
-// Shows/hides one fab, playing its one-shot pop-in animation (.fabReveal,
-// style.css) only on the actual hidden->visible transition, and only once
-// per fab per session (Game.fabRevealed) - updateFabs() runs on nearly
-// every action, so without that guard the animation would replay on every
-// single call once a fab is already visible. Returns true only on that
-// exact transition, so a caller (updateFabs, for fabAutoClicker) can hook
-// a one-time action - like opening its intro modal - onto the real reveal
-// moment rather than re-checking Game.fabRevealed itself.
+// Shows or hides a fab. The pop-in animation plays once per fab per session.
+// Returns true only on that first reveal, so callers can hook a one-time action.
 function revealFab(id, shouldShow) {
   const elDom = $(id);
   if (!shouldShow) { elDom.classList.add("hidden"); return false; }
@@ -432,8 +316,6 @@ function revealFab(id, shouldShow) {
   elDom.classList.remove("hidden");
   if (wasHidden && !Game.fabRevealed.has(id)) {
     Game.fabRevealed.add(id);
-    // Cadeau (the very first fab a new player sees) gets its own richer
-    // "gift" pop - see .fab.fabReveal.gift, style.css.
     const revealCls = id === "fabDailyLogin" ? "fabReveal gift" : "fabReveal";
     elDom.classList.add(...revealCls.split(" "));
     setTimeout(() => elDom.classList.remove(...revealCls.split(" ")), 700);
@@ -450,19 +332,8 @@ function updateFabs() {
   // switches to a "streak" readout (still opens the same modal, read-only).
   const claimedToday = !isDailyLoginAvailable(state);
   revealFab("fabDailyLogin", fusions >= FAB_DISCOVERY_FUSIONS.fabDailyLogin);
-  // Bug (Loris: "tu n'as pas ajouté le visuel cadeau" - it WAS added, but
-  // this line was clobbering it): .textContent on the .fabIcon wrapper
-  // wipes out ANY child, including the <img class="uiIcon"> custom artwork
-  // added there, replacing it with a plain emoji glyph on every single
-  // updateFabs() call (i.e. constantly). No custom art exists yet for the
-  // "claimed today" streak/fire state, so that one still falls back to a
-  // plain emoji - but the default gift state now stays as the real image.
-  //
-  // Only written when the state actually changes, like every other fab here:
-  // updateFabs() runs every frame, and rebuilding this <img> - which covers
-  // most of the button - ~60 times a second meant a tap could start on one
-  // image and end on its replacement, which some browsers don't count as a
-  // click, so the daily modal sometimes failed to open.
+  // Only rewrite the icon when its state changes: updateFabs() runs every frame, and
+  // replacing the <img> under the finger can swallow the tap.
   const dailyIcon = dom.fabDailyLogin.querySelector(".fabIcon");
   const dailyIconKey = claimedToday ? "claimed" : "gift";
   if (dailyIcon.dataset.state !== dailyIconKey) {
@@ -472,43 +343,27 @@ function updateFabs() {
   const dailyLabel = dom.fabDailyLogin.querySelector(".fabLabel");
   const dailyLabelText = claimedToday ? `Série ${state.dailyLogin.streak}` : "Cadeau";
   if (dailyLabel.textContent !== dailyLabelText) dailyLabel.textContent = dailyLabelText;
-  // Loris: the Série state read as flat/plain - reuses the same warm-gold
-  // "active" treatment .fab.active already has for the Boost fab, instead
-  // of only the icon+text changing.
   dom.fabDailyLogin.classList.toggle("active", claimedToday);
   ensureDailySpin(state);
   dom.fabWheel.classList.toggle("hidden", state.dailySpin.freeUsed && state.dailySpin.bonusUsed);
   const allUnlocked = unlockedCount(state) >= TOTAL;
-  // Loris: "le bouton case gratuite ne doit être présent que quand il peut
-  // être utilisé [...] même logique que la roue [...] tout simplement
-  // disparaître." Used to stay visible through its cooldown with just a
-  // dimmer, non-"ready" style - now folded straight into the reveal
-  // condition, same as fabWheel above.
+  // Only shown when usable, like the wheel.
   const unlockCellAdReady = !allUnlocked && Date.now() >= state.cooldowns.unlockCellAdUntil;
   revealFab("fabUnlockCellAd", fusions >= FAB_DISCOVERY_FUSIONS.fabUnlockCellAd && unlockCellAdReady);
 
   const now = Date.now();
   const ac = state.autoClicker;
   const autoClickerActive = ac.activeUntil > now;
-  // "Free" here means no ad needed for the next activation: today's free use,
-  // or one already paid for with an ad (Game.autoClickerPaid, input.js).
+  // "Free" means no ad needed: today's free use, or an ad already watched (Game.autoClickerPaid).
   const autoClickerFree = !autoClickerActive && (isAutoClickerFreeAvailable(state) || Game.autoClickerPaid);
   const justRevealedAutoClicker = revealFab("fabAutoClicker", fusions >= FAB_DISCOVERY_FUSIONS.fabAutoClicker);
   $("fabAutoClicker").classList.toggle("ready", autoClickerFree);
   $("fabAutoClicker").classList.toggle("active", autoClickerActive);
-  // Loris: "il faudrait qu'on fasse une illustration" pour l'indicateur
-  // "pub requise" (était l'emoji 📺) - watch-ad.png, même formule que
-  // currencyIconHtml (icône inline dans du texte). .fabLabel passe en
-  // innerHTML (au lieu de textContent) uniquement pour ce cas - les deux
-  // autres branches restent du texte pur, sans caractère HTML spécial, donc
-  // toujours sûres à passer par innerHTML elles aussi.
+  // innerHTML for the watch-ad icon; the other labels are plain text without HTML characters.
   const autoClickerLabel = autoClickerActive ? formatDuration(ac.activeUntil - now)
     : (autoClickerFree ? "Clicker Auto" : `<img class="inlineCurrencyIcon" src="assets/ui/watch-ad.png" alt=""> Clicker Auto`);
   if ($("fabAutoClickerLabel").innerHTML !== autoClickerLabel) $("fabAutoClickerLabel").innerHTML = autoClickerLabel;
-  // Loris: "un pop up [...] pour proposer et guider le joueur à utiliser
-  // cette fonctionnalité pour la première fois" - fires once, ever
-  // (tutorialShown persists in the save, unlike Game.fabRevealed which is
-  // session-only), the exact moment the fab first becomes visible for real.
+  // Intro modal, once ever, when the fab first appears.
   if (justRevealedAutoClicker && !state.autoClicker.tutorialShown) openAutoClickerIntroModal();
 
   revealFab("fabGemsAd", fusions >= FAB_DISCOVERY_FUSIONS.fabGemsAd);
@@ -519,9 +374,7 @@ function updateFabs() {
     : (gemsAdOnCooldown ? formatDuration(state.cooldowns.gemsAdUntil - now) : `<img class="inlineCurrencyIcon" src="assets/ui/watch-ad.png" alt=""> +${GEMS_AD_REWARD} Gems`);
   if ($("fabGemsAdLabel").innerHTML !== gemsAdLabel) $("fabGemsAdLabel").innerHTML = gemsAdLabel;
   revealFab("fabRunUpgrades", fusions >= FAB_DISCOVERY_FUSIONS.fabRunUpgrades);
-  // Not gated by FAB_DISCOVERY_FUSIONS like the fabs above - a true secret,
-  // stays hidden until the player actually stumbles onto the first egg
-  // (unlockEasterEgg, gods.js), whenever that happens to be.
+  // Secret: stays hidden until the first easter egg is found.
   revealFab("fabSecrets", state.easterEggs.unlockedIds.length > 0);
   dom.bannerAd.classList.toggle("hidden", adsRemoved(state));
   updateQuestNotifDot();
@@ -529,16 +382,7 @@ function updateFabs() {
   const god = state.gods.currentGodId ? getGod(state.gods.currentGodId) : null;
   revealFab("fabCurrentGod", !!god);
   if (god) {
-    // Bug fix, then revisited once portraits shipped (Loris: "l'icone qui
-    // ressort... c'est l'emoji iOS, alors que ca devrait etre
-    // l'illustration"). Was `.textContent = god.emoji`, which wiped out
-    // the <img> baked into index.html on every single updateFabs() call.
-    // Fixed first by leaving the shared "Dieux du Cosmos" trident showing
-    // for every god (no per-god art existed yet then); now that GODS
-    // entries have their own `icon` (assets/gods/, see godPortraitHtml()),
-    // this shows the actually-equipped god's real portrait instead -
-    // only touches the DOM when the equipped god changed, since
-    // updateFabs() runs on every merge/tick.
+    // Only touch the DOM when the equipped god changes.
     if (lastHeaderRender.fabGodId !== god.id) {
       $("fabGodEmoji").innerHTML = godPortraitHtml(god, "uiIcon");
       lastHeaderRender.fabGodId = god.id;
@@ -560,20 +404,11 @@ function updateQuestNotifDot() {
   }
 }
 
-// Duration (ms) the charge-up glow (see .chargeGlow in style.css) plays
-// before the impact fires - MUST stay in sync with the `chargeGlow` CSS
-// animation AND the setTimeout in Sfx.meteorImpact() (audio.js) that fires
-// the impact sound, so the visual landing and the sound line up.
-// Deliberately short: this fires on every single merge (often several per
-// second), so the payoff has to feel instant, not like a cutscene the
-// player has to sit through.
+// Delay before the impact. Must match the `chargeGlow` CSS animation and the delay in
+// Sfx.meteorImpact() (audio.js). Short because it plays on every merge.
 const METEOR_FALL_MS = 110;
 
-// Renders a stand-in tile of a specific tier at `idx` WITHOUT touching
-// state.grid - used to keep showing the pre-merge tile while the charge-up
-// glow plays (state.grid[idx] already holds the merged/upgraded tile by
-// this point, see performMerge()). The real tile is revealed on impact via
-// the normal renderCell(idx, {merged:true}).
+// Draws the pre-merge tile at `idx` without touching state.grid, while the charge-up plays.
 function renderMergeStandIn(idx, tier, cycle) {
   const cell = cellEls[idx];
   cell.className = "cell filled";
@@ -597,14 +432,8 @@ function renderMergeStandIn(idx, tier, cycle) {
   cell.appendChild(tile);
 }
 
-// Removes then re-adds a CSS class to force the browser to restart a
-// class-driven animation even if the class was never removed in between two
-// calls (classList.add on an already-present class is a no-op otherwise) -
-// needed for the grid shake, which lives on one shared element that can be
-// re-triggered by merges landing back to back during a streak, unlike every
-// other effect here which spawns a fresh element. The forced reflow
-// (offsetWidth read) is itself not free, so it's skipped for the common
-// case - most merges aren't landing on top of an already-shaking grid.
+// Restarts a CSS animation on an element that may still have the class.
+// The forced reflow is costly, so it only happens when the class is present.
 function restartAnim(el, cls) {
   if (el.classList.contains(cls)) {
     el.classList.remove(cls);
@@ -613,45 +442,16 @@ function restartAnim(el, cls) {
   el.classList.add(cls);
 }
 
-// Merge impact effect - the whole point is to make landing a merge feel
-// like a real event, not a UI state change:
-//  - the tile itself bursts up well past the cell's bounds (elevated
-//    z-index so it isn't clipped by neighboring cells) before settling
-//    back into place (see .impactHero / mergePop in style.css)
-//  - the ENTIRE grid shakes, not just the one cell
-//  - a flash sweeps out from the impact point across the whole screen
-//  - a starburst + shockwave ring(s) + a spray of rock/star debris play
-//    out locally around the cell
-// `onImpact` fires at the exact landing moment so the caller can reveal
-// the upgraded tile right as it lands. `newTier` is now the PRIMARY driver
-// of visual intensity (a tier-10 merge should feel like a real event, a
-// routine tier-1 merge shouldn't) - `streak` only nudges it a little.
-// Was the other way around (streak dominant) - Noah's feedback: "l'effet
-// quand tu merges est trop fort, il faut qu'il devienne de plus en plus
-// fort en fonction du niveau de merge que tu fais", i.e. progression
-// should track tier, not how fast the player happens to be tapping. The
-// streak-based reward chime pitch (Sfx.meteorImpact, audio.js) is
-// untouched - Loris explicitly liked that part.
+// Merge impact: tile burst, grid shake, screen flash, rays, shockwave rings and debris.
+// `onImpact` fires on landing so the caller reveals the new tile then.
+// Intensity grows mainly with `newTier`; `streak` only adds a little.
 function playMeteorMerge(idx, onImpact, streak, newTier) {
   streak = streak || 0;
-  // Lowered again - Loris: "l'animation des premieres cases est encore
-  // trop intense ce qui fait qu'on voit pas bien la progression". Tier 1
-  // now starts around .6 (was 1.0), so it visibly ramps up over the tiers
-  // instead of already being most of the way to the tier-10 cap. The
-  // screen flash's reach (style.css .screenFlash) also had a fixed floor
-  // regardless of power - now fully proportional too, so a low-power merge
-  // genuinely stays small instead of still blooming out a fixed amount.
   const power = Math.min(0.4 + Math.min(newTier || 1, 10) * 0.19 + Math.min(streak, 5) * 0.02, 2.3);
   const cell = cellEls[idx];
 
-  // Impact colors now match the landed tile's own gradient (TIERS[].from/to)
-  // instead of a fixed gold/amber palette - Loris: "les couleurs devraient
-  // pas être les couleurs de la case ?". --mergeBright/--mergeDark carry the
-  // "r, g, b" triplets consumed by style.css (rgba(var(--mergeBright), a)),
-  // set on `cell` (parent of every impact element except screenFlash, which
-  // lives on <body> and gets its own copy below) so a merge landing on a
-  // DIFFERENT cell moments later - or an older effect from this same cell
-  // still fading out - never has its colors swapped mid-animation.
+  // Impact colors come from the tile gradient. Set on `cell` so an effect on another cell
+  // never changes these colors mid-animation (screenFlash is on <body>, it gets its own copy).
   const tier = TIERS[Math.min(Math.max((newTier || 1) - 1, 0), TIERS.length - 1)];
   const mergeBright = hexRgbTriplet(tier.from);
   const mergeDark = hexRgbTriplet(tier.to);
@@ -662,11 +462,7 @@ function playMeteorMerge(idx, onImpact, streak, newTier) {
   glow.className = "chargeGlow";
   cell.appendChild(glow);
   setTimeout(() => {
-    // Measured BEFORE onImpact() touches the DOM below - reading layout
-    // (getBoundingClientRect) right after a mutation forces a synchronous
-    // reflow, which is one of the cheap wins for smoother merges (the cell
-    // doesn't move as a result of onImpact(), so there's no need to
-    // re-measure after it anyway).
+    // Measure before onImpact() mutates the DOM, to avoid a forced synchronous reflow.
     const rect = cell.getBoundingClientRect();
 
     glow.remove();
@@ -695,9 +491,7 @@ function playMeteorMerge(idx, onImpact, streak, newTier) {
     cell.appendChild(localFlash);
     setTimeout(() => localFlash.remove(), 260);
 
-    // A 2nd, slightly delayed ring reads as a nicer double-pulse shockwave,
-    // but it's extra DOM churn on every merge for a subtle detail - only
-    // worth it once a streak is actually building.
+    // A second ring only during a streak: extra DOM work for a subtle effect.
     const ringDelays = streak > 0 ? [0, 90] : [0];
     ringDelays.forEach((delay) => {
       setTimeout(() => {
@@ -713,12 +507,7 @@ function playMeteorMerge(idx, onImpact, streak, newTier) {
   }, METEOR_FALL_MS);
 }
 
-// 6-point sparkle burst: individual thin gradient-faded rays (long/short
-// alternating) rotated around the cell center, rather than a single
-// repeating-conic-gradient pinwheel - see the comment on .burstRay in
-// style.css for why (that approach read as flat "light rectangles"). 6
-// rather than 8 - one less element created/removed on every merge, for a
-// difference that's barely noticeable at this size.
+// Separate thin rays rather than one conic-gradient (see .burstRay in style.css).
 function spawnBurstRays(cell, power) {
   const RAY_COUNT = 6;
   for (let i = 0; i < RAY_COUNT; i++) {
@@ -733,9 +522,7 @@ function spawnBurstRays(cell, power) {
 
 function spawnImpactDebris(idx, streak, power) {
   const cell = cellEls[idx];
-  // Kept modest on purpose - this is the single biggest DOM-churn source of
-  // the whole effect (a new element per chip, every merge), so it's the
-  // main lever for keeping streaks (several merges a second) smooth.
+  // Debris creates the most DOM nodes, so keep the count low for fast streaks.
   const count = 8 + Math.min(streak || 0, 4);
   for (let k = 0; k < count; k++) {
     const p = document.createElement("div");
@@ -760,12 +547,7 @@ function spawnFloatingBonus(idx, amount) {
   setTimeout(() => el.remove(), 750);
 }
 
-// Loris: "si je spam une case a débloquer mais que j'ai pas assez de
-// stardust ça rempli mon écran de notif, il faudrait une limite" - caps
-// how many toasts with the exact same text can be on screen at once;
-// spamming the same action past that just gets silently dropped instead
-// of piling up further (the existing ones are still visible and will
-// clear on their own 2s timer).
+// Caps identical toasts on screen, so spamming an action doesn't flood the screen.
 const TOAST_SAME_MSG_LIMIT = 3;
 function toast(msg) {
   const sameMsgCount = Array.from(dom.toastContainer.children).filter(t => t.textContent === msg).length;
@@ -783,11 +565,7 @@ function renderDrawerHead() {
   $("drawerHeadLogo").textContent = state.profile.emoji;
   $("drawerHeadLogo").style.background = `radial-gradient(circle at 35% 30%, #fff, ${state.profile.color})`;
   $("drawerHeadTitle").textContent = state.profile.name;
-  // Exclusive cosmetic reward for finding all 4 secrets (Loris: "un
-  // cosmétique exclusif mais pas skin de cases") - a permanent animated
-  // ring around the profile avatar, distinct from the tile-skin system
-  // entirely. Pure CSS (.drawerLogo.mythicFrame's ::before), so this
-  // .textContent reassignment above doesn't disturb it.
+  // Reward for finding all 4 secrets: animated ring around the avatar (pure CSS).
   $("drawerHeadLogo").classList.toggle("mythicFrame", state.easterEggs.unlockedIds.length >= EASTER_EGGS.length);
 }
 function openDrawer() {
@@ -848,12 +626,10 @@ function openPanel(name) {
   const def = PANEL_RENDERERS[name];
   if (!def) return;
   currentPanel = name;
-  dom.panelTitle.innerHTML = def.title; // was textContent - "skills" title needs the inline energy icon (currencyIconHtml); every other title is a plain string so this is a no-op for them
+  dom.panelTitle.innerHTML = def.title; // some titles embed an inline icon
   def.render();
   dom.panelOverlay.classList.remove("hidden");
-  // Gods screen gets its own background ambiance (gradient/particles) - see
-  // .panelOverlay.godsTheme in style.css - toggled here rather than baked
-  // into .panel itself so every other panel keeps the plain background.
+  // Gods panel has its own background (.panelOverlay.godsTheme).
   dom.panelOverlay.classList.toggle("godsTheme", name === "gods");
 }
 function refreshCurrentPanel() { if (currentPanel) PANEL_RENDERERS[currentPanel].render(); }
@@ -873,29 +649,18 @@ function renderCosmeticGrid(list, equippedId, onAfterAction) {
     const equipped = equippedId === item.id;
     const tile = el("div", "cosmeticTile" + (equipped ? " equipped" : ""));
     const swatch = el("div", "skinSwatch big");
-    // Representative mid-tier icon (index 5 = tier 6) for this set - falls
-    // back to the classic tile's own art/emoji for "Cases classiques" (no
-    // tierSkin override) instead of a static "🚫", and now actually
-    // respects the Emoji/Illustré toggle (Loris: "si on change de mode ça
-    // change pas les visuels donc l'ananas reste un emoji [...] pareil pour
-    // le skin standard on a pas la météorite" - this always rendered the
-    // plain emoji regardless of state.iconStyle, for every set, classic
-    // included).
+    // Representative icon: tier 6 of the set, honoring the Emoji/Illustrated setting.
     const rep = item.tierSkin ? item.tierSkin[5] : TIERS[5];
     if (state.iconStyle !== "emoji" && rep.icon) swatch.innerHTML = `<img src="assets/tiles/${rep.icon}" alt="">`;
     else swatch.textContent = rep.emoji;
     const name = el("div", "cosmeticName", item.name);
-    // Always render a status tag, even when not owned - Loris: the cards
-    // in this grid don't all have the same height (Légumes' card was
-    // shorter than Fruits'), because a not-owned card skipped the tag
-    // element entirely instead of just showing a different one.
+    // Always render a status tag so every card has the same height.
     const status = equipped ? el("span", "tag equipped", "Équipé")
       : (owned ? el("span", "tag owned", "Possédé") : el("span", "tag", "Non possédé"));
     const btn = el("button", "btn" + (equipped ? "" : " primary"), equipped ? "Équipé" : (owned ? "Équiper" : `${item.cost} ${currencyIconHtml("gems")}`));
     btn.disabled = equipped || (!owned && state.gems < item.cost);
     const runAction = () => { onCosmeticAction(item.id, owned); if (onAfterAction) onAfterAction(); };
-    // Confirmation only guards the actual Gems purchase - just equipping an
-    // already-owned set isn't a spend, no need to gate that behind a modal.
+    // Only a Gems purchase needs confirmation, not equipping.
     btn.addEventListener("click", () => {
       if (owned) { runAction(); return; }
       openConfirmModal({
@@ -905,8 +670,7 @@ function renderCosmeticGrid(list, equippedId, onAfterAction) {
         onConfirm: runAction,
       });
     });
-    // "Aperçu" (Loris): a way to see a set's tiles on an actual mini grid
-    // before spending Gems on it or switching away from the one equipped.
+    // Preview a set on a mini grid before buying or equipping it.
     const previewBtn = el("button", "btn ghost cosmeticPreviewBtn", "👁 Aperçu");
     previewBtn.addEventListener("click", (e) => { e.stopPropagation(); openSkinPreviewModal(item.id); });
     tile.appendChild(swatch);
@@ -919,13 +683,8 @@ function renderCosmeticGrid(list, equippedId, onAfterAction) {
   return grid;
 }
 
-// Loris: on the Pass Supernova's daily-Gems perk, "indique le +xx% par
-// rapport au prix des gemmes dans la boutique (genre 100 par jour = 3000
-// dans le mois donc 3000 a 5,99$ par rapport à 100 gemmes qui coûte 0,99$
-// convertie à 3000 [...] comparé combien de % de gemmes on a en plus
-// grâce au pass supernova)". Computed from the live IAP_CATALOG prices
-// (not hardcoded) so it can't go stale if any of them change - parses
-// "0,99 $" style strings (French comma decimal) back into numbers.
+// Pass daily Gems value vs buying the same Gems in the shop, from live IAP_CATALOG prices.
+// Parses French prices like "0,99 $".
 function parsePriceToNumber(priceStr) {
   const match = priceStr.replace(",", ".").match(/[\d.]+/);
   return match ? parseFloat(match[0]) : 0;
@@ -947,13 +706,7 @@ function renderShopPanel() {
   const state = Game.state;
   dom.panelBody.innerHTML = "";
 
-  // Wording pass (Loris): "Boosts publicitaires" / "Cases & boosts (Gems)" /
-  // "Boutique premium (achats intégrés)" read as internal/technical labels
-  // rather than something a player would want to tap into.
   dom.panelBody.appendChild(el("h3", null, "Bonus vidéo"));
-  // Side by side (2 cols) instead of stacked - Loris found the two ad cards
-  // taking a full row each felt like wasted space now that shopGrid2 (see
-  // "Cases & boosts" below) already proved the compact 2-column layout works.
   const adGrid = el("div", "shopGrid2");
   const ac = state.autoClicker;
   const autoClickerActive = ac.activeUntil > Date.now();
@@ -1003,16 +756,11 @@ function renderShopPanel() {
   dom.panelBody.appendChild(gemGrid);
 
   dom.panelBody.appendChild(el("h3", null, `<img class="inlineCurrencyIcon" src="assets/ui/palette.png" alt=""> Sets d'icônes`));
-  // Emoji/Illustré switch moved to the skin MANAGER popup (openSkinManagerModal)
-  // per Loris - it's a display preference, not a shop purchase, it doesn't
-  // belong in the boutique. See renderIconStyleToggle() below.
+  // The Emoji/Illustrated toggle lives in the skin manager, not the shop.
   dom.panelBody.appendChild(renderCosmeticGrid(EMOJI_SETS, state.equippedEmojiSet));
 
   dom.panelBody.appendChild(el("h3", null, "Offres Premium"));
-  // Order (Loris, curated - NOT price-sorted any more): Pass (hero) ->
-  // Suppression des pubs -> Multiplicateur Stardust -> everything else in
-  // catalog order. A price sort had been pulling the Gems packs into the
-  // #2/#3 featured slots instead, which wasn't the intent.
+  // Curated order: Pass (hero), remove ads, Stardust boost, then the rest in catalog order.
   const daysSinceFirst = daysBetween(state.firstPlayedDay, todayStr());
   const visibleProducts = IAP_CATALOG.filter(product => {
     if (product.startersOnly && daysSinceFirst > 2) return false;
@@ -1039,12 +787,7 @@ function renderShopPanel() {
     return btn;
   };
 
-  // Every card in this section shares the Pass's premium chrome now (gold
-  // glow border + continuous pulse, .iapCard) - Loris liked the Pass card's
-  // look enough to want it applied everywhere, not just the top 3. Only the
-  // Pass keeps the perks-list layout (it's the only product with a `perks`
-  // array) and the "★ Meilleure offre" ribbon (badging every card with
-  // that would defeat the point).
+  // All cards share the premium look; only the Pass has the perks list and the ribbon.
   if (pass) {
     const hero = el("div", "card iapCard iapHero");
     hero.innerHTML = `<div class="iapHeroBadge">★ Meilleure offre</div>
@@ -1068,25 +811,12 @@ function renderShopPanel() {
     card.appendChild(buyBtn(product, "btn primary full"));
     dom.panelBody.appendChild(card);
   });
-  // Loris: "dans la boutique enlève le bouton 'restaurer mes achats' je
-  // vois vraiment pas son utilité" - removed here specifically; the same
-  // button still exists in Réglages (renderSettingsPanel, below), which is
-  // both the more standard location for it and the one Apple's App Store
-  // guidelines actually expect to find it in.
+  // "Restore purchases" lives in Settings (renderSettingsPanel).
 }
 
 // ---------------- Skills panel ----------------
-// Loris: "changer la page ascension et alchimie pour que ce ne soit plus
-// des onglets par lignes mais des blocs 2 par 2" - cards live inside a
-// .skillGrid (2-column CSS grid, style.css) instead of going straight into
-// panelBody's own single-column flex stack.
-// Per-level effect text (Loris: "dans ascension il manque les états des
-// bonus actuel et suivant comme on a fait sur la page alchimie") - same
-// current/next readout as runUpgradeEffectAtLevel() below, mirrored for
-// SKILL_TREE's own 5 branches. Percentages/values here are display-only
-// copies of the real ones applied in state.js (productionMultiplier/
-// autoSpawnIntervalMs/offlineCapHours) and economy.js (performMerge's
-// luckChance) - keep in sync if either changes. Returns null at level 0.
+// Effect text for current/next level. Display copies of the real formulas in state.js
+// and economy.js: keep them in sync. Returns null at level 0.
 function skillEffectAtLevel(key, level) {
   if (level <= 0) return null;
   if (key === "prod") return `+${level * 3}% production de Stardust`;
@@ -1127,13 +857,8 @@ function renderSkillsPanel() {
 }
 
 // ---------------- Run upgrades panel ----------------
-// Per-level effect text (Loris: "on voit pas l'état actuel et le prochain
-// niveau des bonus" - the card only showed the generic per-level desc, not
-// what the CURRENT level is actually granting nor what the NEXT level would
-// bump it to). Percentages here are display-only copies of the real ones
-// applied in state.js (productionMultiplier/autoSpawnIntervalMs) and
-// economy.js (maybeTriggerResonance/previewBigBangGain) - keep both in sync
-// if either changes. Returns null at level 0 (nothing active yet).
+// Effect text for current/next level. Display copies of the real formulas in state.js
+// and economy.js: keep them in sync. Returns null at level 0.
 function runUpgradeEffectAtLevel(key, level) {
   if (level <= 0) return null;
   if (key === "catalyst") return `+${level * 4}% production de Stardust`;
@@ -1143,9 +868,7 @@ function runUpgradeEffectAtLevel(key, level) {
   return null;
 }
 
-// Mirrors renderSkillsPanel() above, but priced in Stardust and reset to 0
-// every Big Bang (RUN_UPGRADE_TREE, config.js - see the design comment
-// there for why this is a separate tree from SKILL_TREE).
+// Like renderSkillsPanel(), for RUN_UPGRADE_TREE (Stardust, reset every Big Bang).
 function renderRunUpgradesPanel() {
   const state = Game.state;
   dom.panelBody.innerHTML = "";
@@ -1228,19 +951,7 @@ function renderStoryPanel() {
   const state = Game.state;
   dom.panelBody.innerHTML = "";
 
-  // Loris: "le texte dans la page histoire est bizarre il y a plusieurs
-  // lignes qui ont un retour à la ligne inutile" - same bug as the god
-  // ritual modal text fixed earlier this session: `.card p.desc` has
-  // white-space:pre-line (for genuinely multi-line content elsewhere), so
-  // a paragraph's text wrapped across several source lines for editor
-  // readability was rendering as forced mid-sentence line breaks. Each
-  // <p class="desc"> below is now kept on one single source line - let it
-  // wrap naturally instead.
-  // Loris: "il y a un emoji de météorite dans le premier bloc de texte, on
-  // devrait mettre une illustration du big bang à la place" - reuses the
-  // existing bigbang.png art (already used for the Big Bang button/modal)
-  // rather than commissioning a new one; "La Rupture" is the game's own
-  // in-universe Big-Bang-like event, so the imagery already fits.
+  // Keep each <p class="desc"> on one source line: .card p.desc uses white-space: pre-line.
   const intro = el("div", "card storyCard");
   intro.innerHTML = `<img class="storyMark" src="assets/ui/bigbang.png" alt="">
     <h3>La Rupture</h3>
@@ -1255,7 +966,6 @@ function renderStoryPanel() {
 
   dom.panelBody.appendChild(el("h3", null, "Deux camps, un seul Cosmos"));
   const camps = el("div", "card storyCard");
-  // Loris: "enlève la phrase 'aucun des deux n'a tort - seulement etc'" - retirée, pas remplacée.
   camps.innerHTML = `<p class="desc">Les Dieux que tu réveilles se souviennent tous de la Rupture, mais pas de la même façon. Les <strong style="color:#93c5fd;">bienveillants</strong> 🕊️ veulent restaurer l'ordre ancien. Les <strong style="color:#fca5a5;">déchus</strong> 🔥 ont pris goût au chaos et refusent d'y renoncer.</p>`;
   dom.panelBody.appendChild(camps);
 
@@ -1343,17 +1053,6 @@ function renderProgressionPanel() {
   // deliberate Stardust sink) before Erebus (épique, a deliberate hidden
   // challenge most players won't stumble into by accident).
   const godById = (id) => GODS.find(g => g.id === id);
-  // Was `g.emoji` (plain glyph) for every god step here except Thanatos/
-  // Chronos, which got a generic stand-in icon (mort.png/sablier.png)
-  // before their own portraits existed - Loris: "tu dois changer les
-  // icones de dieux partout ou c'est necessaire... dans l'onglet
-  // progression c'est pas le cas". Now that every god in GODS has its own
-  // `icon` (assets/gods/), godPortraitHtml() gives each step its actual
-  // portrait, Thanatos/Chronos included - no more generic stand-ins.
-  // .inlineTierIcon already has a dedicated size rule for .roadIconGlyph
-  // context (see style.css) from the "Atteindre l'Univers" step below, so
-  // these custom-icon steps reuse that same class rather than needing a
-  // new one.
   const godStep = (id) => { const g = godById(id); return { emoji: godPortraitHtml(g, "inlineTierIcon"), done: isGodUnlocked(state, id), text: g.name, sub: g.unlock.label }; };
   const roadIcon = (src) => `<img class="inlineTierIcon" src="assets/ui/${src}" alt="">`;
   const steps = [];
@@ -1362,9 +1061,7 @@ function renderProgressionPanel() {
   steps.push(godStep("helios"));
   steps.push(godStep("nyx"));
   steps.push(godStep("erebus"));
-  // Fixed at UNIVERSE_TIER (config.js), not TIERS.length - this step is
-  // specifically "reach Univers", which no longer means "reach the last
-  // tier" now that TIERS extends past it.
+  // UNIVERSE_TIER, not TIERS.length: this step is about reaching Univers.
   steps.push({ emoji: tierInlineIconHtml(UNIVERSE_TIER), done: state.lifetime.maxTierEver >= UNIVERSE_TIER, text: "Atteindre l'Univers" });
   steps.push({ emoji: roadIcon("bigbang.png"), done: state.lifetime.bigBangCount >= 1, text: "Premier Big Bang" });
   steps.push(godStep("thanatos"));
@@ -1385,14 +1082,7 @@ function renderProgressionPanel() {
 }
 
 // ---------------- God ritual & selection actions ----------------
-// The moon-merge ritual now grants Séléna AND Zéphar at once (see
-// onFusionForGods, gods.js) specifically so this is a real side-by-side
-// choice - un dieu bienveillant, un dieu déchu - matching the modal's own
-// "choisis celui qui t'accompagnera" text, which used to show a single
-// card with nothing to actually choose between (Loris). .bienveillant/
-// .dechu (below) tint each card toward the same blue/red used for the two
-// camps in the Histoire panel (renderStoryPanel), so the choice reads
-// visually, not just via the tiny 🕊️/🔥 elsewhere.
+// The ritual grants two gods, a benevolent and a fallen one. Cards are tinted by alignment.
 function openGodPickerModal() {
   const state = Game.state;
   const list = $("godRitualList");
@@ -1404,10 +1094,7 @@ function openGodPickerModal() {
       <div class="godName">${god.name}</div>
       <div class="godTitle">${god.title}</div>
       <p class="godDesc">${god.desc}</p>`;
-    // Loris: "demande de confirmation lors du choix du premier dieu [...]
-    // sinon c'est trop simple de faire une erreur sans faire exprès" - a
-    // single tap used to commit immediately. Now it opens the shared
-    // confirm modal (openConfirmModal, above) on top of this one instead.
+    // Confirm first: a misclick would lock in the wrong first god.
     card.addEventListener("click", () => openConfirmModal({
       title: `Choisir ${god.name} ?`,
       text: `${god.title} — ${god.desc}`,
@@ -1419,7 +1106,7 @@ function openGodPickerModal() {
         $("godRitualModal").classList.add("hidden");
         saveState(state);
         renderAll();
-        maybeOpenGodRevealModal(); // drains anything queued while the ritual modal was up
+        maybeOpenGodRevealModal(); // shows reveals queued while the ritual was open
       },
     }));
     list.appendChild(card);
@@ -1464,17 +1151,10 @@ function openGodDetailModal(godId) {
     } else if (god.unlock.type === "box") {
       info.innerHTML = `${lockIconHtml()} Uniquement via la Boîte Cosmique (Boutique) - pas d'autre moyen de l'éveiller`;
     } else if (god.unlock.type === "secret") {
-      // Ananké - was falling into the generic "rituel des lunes" text
-      // below (Loris: "ne fait aucun sens" for her), since that catch-all
-      // branch used to be the only one handling anything past
-      // milestone/challenge/shop/box. A real hint instead, pointing at the
-      // Secrets challenge (fabSecrets/openSecretsModal) without spelling
-      // out its 4 conditions - same enigmatic register as EASTER_EGGS'
-      // own hint/revealText and the Secrets modal's intro copy.
+      // Hint at the Secrets challenge without giving its conditions.
       info.innerHTML = `${lockIconHtml()} Elle ne répond à aucun rituel connu. Quatre échos discrets sommeillent dans ton Cosmos - trouve-les tous pour qu'elle se révèle.`;
     } else {
-      // "ritual" - Séléna et Zéphar, accordés automatiquement par le
-      // rituel des lunes (gods.js) sans étape à afficher ici d'autre.
+      // "ritual": Séléna and Zéphar.
       info.innerHTML = `${lockIconHtml()} Éveille ton premier Dieu via le rituel des lunes.`;
     }
     card.appendChild(info);
@@ -1486,10 +1166,6 @@ function openGodDetailModal(godId) {
       card.appendChild(btn);
     }
   } else if (!equipped) {
-    // Loris: "il faudrait qu'on puisse changer de dieu en pleine partie,
-    // pas besoin d'attendre le prochain big bang" - chooseGod() (gods.js)
-    // now switches immediately, always, so this button has no "queued"
-    // state to distinguish any more - it's the only non-equipped case left.
     const btn = el("button", "btn full", "Choisir ce Dieu");
     btn.style.marginTop = "8px";
     btn.addEventListener("click", () => { onChooseGod(god.id); openGodDetailModal(god.id); });
@@ -1517,11 +1193,8 @@ function openGodDetailModal(godId) {
   $("godDetailModal").classList.remove("hidden");
 }
 
-// Loris: "il n'y a pas de pop up quand on débloque un nouveau dieu hormis
-// pour les deux premiers" - shared reveal for every unlockGod() (gods.js)
-// that isn't already covered by its own dedicated modal (the ritual pair's
-// picker, the Cosmic Box's reveal). Called via maybeOpenGodRevealModal()
-// (input.js), never directly - that's what drains Game.pendingGodReveals.
+// Unlock modal for a new god. Open it through maybeOpenGodRevealModal() (input.js),
+// which drains Game.pendingGodReveals.
 let godUnlockModalGodId = null;
 function openGodUnlockModal(godId) {
   godUnlockModalGodId = godId;
@@ -1536,14 +1209,11 @@ function openGodUnlockModal(godId) {
   Sfx.chest();
   $("godUnlockModal").classList.remove("hidden");
 }
-// Loris: "quand on débloque les dieux [...] on peut l'équiper ou fermer le
-// pop up" - onEquipGodFromUnlockModal (input.js) calls chooseGod() then
-// this, so the modal's own closing logic (draining the reveal queue) stays
-// in one place regardless of which button sent the player here.
+// Every way of closing ends here so the reveal queue is drained in one place.
 function closeGodUnlockModal() {
   godUnlockModalGodId = null;
   $("godUnlockModal").classList.add("hidden");
-  maybeOpenGodRevealModal(); // shows the next queued reveal, if any (rare double-unlock in the same moment)
+  maybeOpenGodRevealModal(); // next queued reveal, if any
 }
 
 // ---------------- VIP daily Gems (Pass Supernova) ----------------
@@ -1556,10 +1226,7 @@ function closeVipGemsModal() { $("vipGemsModal").classList.add("hidden"); }
 // ---------------- Auto-clicker intro (first-time guide) ----------------
 function openAutoClickerIntroModal() {
   const state = Game.state;
-  // Set immediately on open, not on close/confirm - guarantees this never
-  // shows a 2nd time regardless of what the player does with it (closing
-  // via the backdrop bypasses the "Choisir ma case" button entirely, see
-  // wireModalBackdropClose, input.js).
+  // Marked as shown on open: a backdrop close skips the buttons.
   state.autoClicker.tutorialShown = true;
   saveState(state);
   $("autoClickerIntroModal").classList.remove("hidden");
@@ -1624,18 +1291,11 @@ function renderSettingsPanel() {
 }
 
 // ---------------- Tutorial ----------------
-// Text is HTML (see showTutStep's innerHTML below), not plain text -
-// tierInlineIconHtml() needs that to show the real artwork inline instead
-// of the old plain emoji glyphs, which looked inconsistent once the grid
-// itself moved to custom art.
+// Step text is HTML so tier icons can be inlined.
 const TUT_STEPS = [
   { title: "Invoquer", text: () => `Appuie sur « Invoquer » pour faire apparaître un Météorite ${tierInlineIconHtml(1)} sur une case vide de la grille.`, target: () => dom.invokeBtnStardust },
   { title: "Fusionner", text: () => `Glisse un astéroïde sur une case adjacente identique pour les fusionner en une Lune ${tierInlineIconHtml(2)}.`, target: () => cellEls[8] },
-  // No target (Loris: "il y a comme une sorte de carré/rectangle qui
-  // apparaît alors qu'il n'y a pas ça sur l'étape 1 et 2" - the previous
-  // target here was the whole .grid container, so the glowing outline
-  // wrapped all 30 cells instead of pointing at one small thing like the
-  // other two steps do).
+  // No target: highlighting the whole grid looked like a stray rectangle.
   { title: "Progresser", text: () => `Continue à fusionner pour atteindre Planète ${tierInlineIconHtml(4)}, Étoile ${tierInlineIconHtml(6)}, Trou noir ${tierInlineIconHtml(8)}... jusqu'à l'Univers ${tierInlineIconHtml(10)}, puis déclenche un Big Bang pour recommencer plus fort !`, target: () => null },
 ];
 let tutIndex = 0;
@@ -1658,13 +1318,8 @@ function endTutorial() {
 }
 
 // ---------------- Offline modal ----------------
-// A second absence can land while the first one's gain is still on screen,
-// uncollected - most notably during "Doubler (pub)" itself: the native ad
-// takes focus, handing it back fires handleAppResume (main.js), and
-// onOfflineDouble reads Game.pendingOfflineGain only once the ad resolves.
-// Replacing the pending gain there swapped a whole night's earnings for the
-// ~30s the ad lasted, and then doubled THAT. So an uncollected gain is
-// added to, never overwritten: both spans were genuinely spent away.
+// A second absence can arrive while a gain is still uncollected, e.g. when the ad from
+// "Doubler (pub)" returns focus. Add to the pending gain, never replace it.
 function openOfflineModal(gainInfo, spawnedCount) {
   const pending = Game.pendingOfflineGain;
   if (pending && !$("offlineModal").classList.contains("hidden")) {
@@ -1710,7 +1365,7 @@ function openWheelModal() {
   ensureDailySpin(Game.state);
   $("wheelResult").textContent = "";
   $("wheelEl").style.transform = "rotate(0deg)";
-  wheelRotation = 0; // keep input.js's running spin total in sync with this visual reset
+  wheelRotation = 0; // keep input.js's spin total in sync
   refreshWheelButtons();
   $("wheelModal").classList.remove("hidden");
 }
@@ -1740,8 +1395,7 @@ function openBigBangSummaryModal({ stardustEarned, maxTier, gain }) {
   $("bbSummaryStardust").textContent = formatNumber(stardustEarned);
   $("bbSummaryTier").innerHTML = `${TIERS[maxTier - 1].name} ${tierInlineIconHtml(maxTier)}`;
   $("bbSummaryEnergy").innerHTML = `+${formatNumber(gain)} ${currencyIconHtml("energy")}`;
-  // innerHTML, not textContent - nextGodMilestoneHint() now embeds a real
-  // <img> portrait (godPortraitHtml) instead of a plain emoji character.
+  // innerHTML: the hint contains a portrait <img>.
   $("bbSummaryHint").innerHTML = nextGodMilestoneHint(state)
     || "Tous les Dieux à objectif direct sont éveillés - tente ta chance à la Boîte Cosmique (Boutique) pour les derniers !";
   $("bigBangSummaryModal").classList.remove("hidden");
@@ -1752,22 +1406,14 @@ function openRestartModal() { $("restartModal").classList.remove("hidden"); }
 function closeRestartModal() { $("restartModal").classList.add("hidden"); }
 
 // ---------------- Generic purchase/action confirmation ----------------
-// Loris: every purchase should ask for confirmation before spending
-// anything - too easy to tap "Acheter" by accident otherwise. Wired at
-// every real buy button (Boutique Gems items, IAP cards, fusion/remove-ads
-// promo popups - see wireEvents(), input.js) instead of a bespoke confirm
-// step per call site.
+// Confirmation before any spend.
 let pendingConfirmAction = null;
 let pendingConfirmDontAskKey = null;
-// `dontAskKey` (optional): shows a "Ne plus jamais demander" checkbox -
-// checking it before confirming sets state.dontAskAgain[dontAskKey] = true
-// permanently, so future calls to openConfirmModal with that same key can
-// be skipped by the caller entirely (Loris, re: the Échanger button
-// specifically - "possible de cocher une case pour ne plus jamais voir ce
-// message"). Every other caller just omits it, same as before.
+// `dontAskKey` (optional): shows a "don't ask again" checkbox that sets
+// state.dontAskAgain[dontAskKey]. The caller checks that flag and skips the modal.
 function openConfirmModal({ title, text, confirmLabel, onConfirm, dontAskKey }) {
   $("confirmActionTitle").textContent = title;
-  $("confirmActionText").innerHTML = text; // some callers embed an inline currency icon (currencyIconHtml)
+  $("confirmActionText").innerHTML = text; // may contain an inline currency icon
   $("confirmActionConfirm").textContent = confirmLabel || "Confirmer";
   pendingConfirmAction = onConfirm;
   pendingConfirmDontAskKey = dontAskKey || null;
@@ -1790,21 +1436,11 @@ function onConfirmActionConfirm() {
 function openStardustInfoModal() {
   const state = Game.state;
   ensureDailyStats(state);
-  // Loris: "dans le pop up de poussière étoiles on devrait pouvoir voir la
-  // production actuelle de stardust" - same value/format as the header's
-  // live rate (updateHeader, above), just surfaced here too since this
-  // popup is where players go to check on their grid's stats.
   $("stardustInfoRate").textContent = "+" + formatNumber(totalProduction(state)) + "/s";
   const runElapsedMs = Date.now() - state.runStartedAt;
   $("stardustInfoRunTime").textContent = formatDuration(runElapsedMs);
   $("stardustInfoToday").textContent = "+" + formatNumber(state.lifetime.stardustEarned - state.dailyStats.stardustAtDayStart);
-  // Loris: "le texte du pop up [...] n'est pas aligné avec le texte à
-  // gauche". .rowBetween lays the label/value side by side on one line
-  // (fine for a short duration like "12:34"), but the no-record fallback is
-  // a full sentence that wraps to several lines and threw off the
-  // side-by-side alignment against the label. Switches that one row to a
-  // stacked layout (.rowBetween.stack, style.css) only when showing that
-  // sentence instead.
+  // The no-record text wraps, so that row switches to a stacked layout.
   const noRecord = state.lifetime.bestBigBangMs === null;
   $("stardustInfoBest").textContent = noRecord
     ? "Termine ton premier Big Bang pour établir un record !"
@@ -1821,10 +1457,7 @@ function closeStardustInfoModal() { $("stardustInfoModal").classList.add("hidden
 // already read state.iap.vipUntil live the instant it's set in onBuyIAP,
 // this modal just makes that unmistakable instead of easy to doubt.
 function openPurchaseConfirmModal(product) {
-  // No icon prefix here any more (was "✅ ...") - the big animated
-  // valide.png checkmark right above the title (.purchaseCheckAnim,
-  // index.html) already carries that, repeating a small one inline next
-  // to the text would just compete with it.
+  // No icon prefix: the animated checkmark above the title already shows it.
   $("purchaseConfirmTitle").textContent = product.name;
   $("purchaseConfirmText").textContent = product.id === "vip_monthly"
     ? `Le Pass Supernova est actif dès maintenant : +100% de production, plus aucune pub, tous les skins débloqués, et tes ${VIP_DAILY_GEMS} Gems quotidiennes dès demain.`
@@ -1848,15 +1481,10 @@ function openCosmicBoxRevealModal(box) {
   $("cosmicBoxModal").classList.remove("hidden");
   setTimeout(() => {
     anim.className = "cosmicBoxAnim revealed";
-    // Loris: "quand le joueur a tout les dieux, la boite cosmique se
-    // transforme en une boite [...] de gemmes" - rollCosmicBox() (gods.js)
-    // never hands out a duplicate any more, so this is the only remaining
-    // non-god outcome (box.god is unset here).
+    // Every god owned: the box gave Gems instead.
     if (box.allGodsOwned) {
       anim.style.setProperty("--rarity-color", "#38bdf8");
-      // Plain large emoji, not currencyIconHtml's small inline glyph - this
-      // frame is sized (88x88, font-size:52px) for a portrait/emoji-scale
-      // reveal, not a 16px inline icon.
+      // Large emoji: the frame is sized for a portrait, not an inline icon.
       anim.textContent = "💎";
       $("cosmicBoxTitle").textContent = "✨ Panthéon complet !";
       $("cosmicBoxText").innerHTML = `Tous les Dieux sont déjà à toi - +${box.gems} ${currencyIconHtml("gems")}`;
@@ -1873,14 +1501,10 @@ function openCosmicBoxRevealModal(box) {
 }
 function closeCosmicBoxModal() { $("cosmicBoxModal").classList.add("hidden"); }
 
-// ---------------- Secret 4-egg challenge (Loris) ----------------
-// See EASTER_EGGS (config.js) and unlockEasterEgg() (gods.js, called from
-// wherever each egg's own trigger naturally happens - economy.js/input.js
-// - this file only ever consumes its return value to decide what to show).
+// ---------------- Secret 4-egg challenge ----------------
+// See EASTER_EGGS (config.js) and unlockEasterEgg() (gods.js).
 
-// Small pips row (●/○ = filled/locked) shared by the found-reveal popup and
-// the persistent counter modal. `justUnlockedId` (optional) marks exactly
-// one pip to play its one-shot fill animation (.eggPip.justFilled).
+// Pips (●/○) for found/locked eggs. `justUnlockedId` animates one pip.
 function renderEggPips(state, justUnlockedId) {
   const row = el("div", "eggPipsRow");
   EASTER_EGGS.forEach(egg => {
@@ -1891,11 +1515,7 @@ function renderEggPips(state, justUnlockedId) {
   return row;
 }
 
-// Called with unlockEasterEgg()'s own return value - null means "already
-// found, nothing to show" (callers already guard on this, but staying safe
-// here too). `complete` (the 4th egg) skips the modest reveal entirely and
-// goes straight to the grand finale instead - Loris wants that moment to
-// stand alone, not stacked under a smaller popup first.
+// Takes unlockEasterEgg()'s result. The last egg opens the finale instead of the small reveal.
 function revealEasterEgg(result) {
   if (!result) return;
   if (result.complete) { openEggFinaleModal(); return; }
@@ -1939,11 +1559,7 @@ function openSecretsModal() {
 function closeSecretsModal() { $("secretsModal").classList.add("hidden"); }
 
 // ---------------- Grand finale (all 4 eggs found) ----------------
-// Loris: "l'animation la plus impressionnante jamais proposée" - the
-// single biggest visual moment in the game, reserved for this one
-// permanent, once-ever reveal. Same visual vocabulary as the merge-impact
-// effects (burst rays, falling particles) as spawnBurstRays() above, just
-// bigger and combined with a slow dramatic portrait reveal + screen shake.
+// Biggest animation in the game, shown once: rays, falling sparkles, shake, portrait reveal.
 function openEggFinaleModal() {
   const god = getGod("ananke");
   $("eggFinalePortrait").innerHTML = godPortraitHtml(god, "eggFinalePortraitImg");
@@ -1994,11 +1610,8 @@ function openSkinManagerModal() {
   const state = Game.state;
   const list = $("skinManagerList");
   list.innerHTML = "";
-  // No palette icon here (unlike the shop's identical section) - the modal's
-  // own title just above already carries it (#skinManagerModal h3, index.html),
-  // right next to this one - Loris: "il y a deux fois cette illustration".
+  // No palette icon: the modal title already has it.
   list.appendChild(el("h3", null, "Set d'icônes"));
-  // Emoji/Illustré switch lives here (Loris), not in the shop.
   list.appendChild(renderIconStyleToggle(openSkinManagerModal));
   list.appendChild(renderCosmeticGrid(EMOJI_SETS, state.equippedEmojiSet, openSkinManagerModal));
   $("skinManagerModal").classList.remove("hidden");
@@ -2017,15 +1630,7 @@ function openRemoveAdsPromptModal() {
 }
 function closeRemoveAdsPromptModal() { $("removeAdsPromptModal").classList.add("hidden"); }
 
-// Fusion-milestone soft-prompts (25 -> starter pack, 80 -> Pass Supernova),
-// see checkFusionPromo()/Game.pendingPromo in retention.js and
-// maybeOpenFusionPromo() in input.js. One shared modal, content picked by
-// `kind`. `icon` (optional): custom artwork replacing the title's plain
-// emoji, same "falls back to emoji until art exists" pattern as
-// tierIconNode()/roadIcon() elsewhere - starterPack reuses cadeau.png (a
-// starter pack IS a bundle of starting gifts, no new art needed); vipPass
-// uses the dedicated supernova.png burst, also used for the shop's own
-// Pass Supernova hero card (renderShopPanel) - one asset, two spots.
+// Fusion-milestone promos (checkFusionPromo, retention.js). `icon`: title artwork.
 const FUSION_PROMOS = {
   starterPack: {
     title: "Bien joué !",
@@ -2036,13 +1641,7 @@ const FUSION_PROMOS = {
   vipPass: {
     title: "Tu es accroché !",
     icon: "supernova.png",
-    // Loris: "dans le texte de description du pass supernova c'est écrit
-    // 'pas de publicité pour toujours' il faut enlever le 'pour toujours'
-    // puisque c'est appliqué que quand l'utilisateur possède le pass" -
-    // same fix as the perks list (config.js). Also caught while touching
-    // this: "50 fusions déjà" and "50 Gems" were both stale (the vipPass
-    // promo threshold moved to 130 fusions, and VIP_DAILY_GEMS to 100,
-    // both earlier this session).
+    // Say "while active", not "forever": no ads only lasts while the Pass is active.
     text: "130 fusions déjà - le Pass Supernova retire les pubs tant qu'il est actif, double ta production de Stardust et t'offre 100 Gems chaque jour. Pensé pour les joueurs comme toi.",
     productId: "vip_monthly",
   },
@@ -2051,7 +1650,7 @@ let fusionPromoProductId = null;
 function openFusionPromoModal(kind) {
   const promo = FUSION_PROMOS[kind];
   const product = promo && IAP_CATALOG.find(p => p.id === promo.productId);
-  if (!product || isOneTimeIapOwned(Game.state, product.id)) return; // defensive - e.g. the offer was already bought between the trigger and this firing
+  if (!product || isOneTimeIapOwned(Game.state, product.id)) return; // already bought since the promo was queued
   fusionPromoProductId = product.id;
   $("fusionPromoTitle").innerHTML = promo.icon
     ? `<img class="inlineCurrencyIcon" src="assets/ui/${promo.icon}" alt=""> ${promo.title}`
@@ -2100,20 +1699,8 @@ function buildStars() {
   buildWheelSegments();
 }
 
-// Loris: the wheel had zero information on it - 7 flat conic-gradient
-// slices with no labels at all, just color. Fixed in two steps: first, the
-// conic-gradient's boundary angles are computed from WHEEL_PRIZES' real
-// weights (30/20/20/10/10/5/5) instead of hand-picked CSS values that didn't
-// actually match the real odds. Second, prize info went ON the wheel itself
-// as text labels directly on the slices - through two rounds of trying to
-// keep those labels from spilling past their own (sometimes very narrow)
-// slice, still not clean enough (Loris: "on les voit toujours pas très
-// bien", "le 500 il est entre 2-3 cases", "le 1500 sort toujours de sa
-// couleur"). Round 3 drops on-wheel labels entirely - the wheel now only
-// carries color + dividers + hub, and every prize (full label, no
-// space-driven truncation any more, plus a color swatch matching its slice)
-// lists in #wheelLegend next to it instead, built here in the same pass.
-// Static content - built once at boot, not on every modal open.
+// Draws the wheel slices from WHEEL_PRIZES weights and lists the prizes in #wheelLegend
+// (labels don't fit on narrow slices). Built once at boot.
 function buildWheelSegments() {
   const wheelEl = $("wheelEl");
   const legendEl = $("wheelLegend");
@@ -2147,33 +1734,21 @@ function buildWheelSegments() {
   wheelEl.appendChild(el("div", "wheelHub"));
 }
 
-// Occasional shooting star crossing the background, behind the grid
-// (Loris: "un fond un peu plus vivant, sans être perturbant") - one at a
-// time, at a random interval, so it reads as a rare little "did you catch
-// that?" moment rather than a repeating pattern that draws the eye.
+// Rare shooting star behind the grid, at random intervals.
 function spawnShootingStar() {
   const bg = $("starsBg");
   const star = document.createElement("div");
   star.className = "shootingStar";
-  // Bug fixes (Loris): (1) the travel distance was a fixed 130-220px,
-  // which - combined with the diagonal dy eating into the horizontal
-  // reach - didn't actually cross a real (esp. narrower mobile) viewport,
-  // so the star visibly stopped mid-screen instead of exiting it.
-  // Distance is now computed from the ACTUAL viewport size, with enough
-  // overshoot (>100%) to guarantee it exits fully before fading. (2) the
-  // trail (::before) was always horizontal, just flipped left/right -
-  // it never actually pointed backward along the real diagonal path,
-  // which read as "off"/disconnected from the star. It's now rotated to
-  // the exact opposite angle of travel (atan2 of the real dx/dy) and
-  // shortened, so it reads as a proper trailing streak.
+  // Distance is based on the viewport so the star always exits the screen.
+  // The trail is rotated opposite to the travel direction.
   const vw = window.innerWidth, vh = window.innerHeight;
   const fromLeft = Math.random() < 0.5;
   const startX = fromLeft ? -vw * 0.08 : vw * 1.08;
   const startY = vh * (0.05 + Math.random() * 0.3);
-  const dx = (fromLeft ? 1 : -1) * vw * (1.16 + Math.random() * 0.14); // always fully crosses + exits
+  const dx = (fromLeft ? 1 : -1) * vw * (1.16 + Math.random() * 0.14); // always crosses and exits
   const dy = vh * (0.35 + Math.random() * 0.35);
   const dist = Math.hypot(dx, dy);
-  const speed = 900 + Math.random() * 500; // px/s - keeps a consistent "shooting star" pace regardless of distance
+  const speed = 900 + Math.random() * 500; // px/s, same pace whatever the distance
   const dur = Math.min(Math.max(dist / speed, 0.7), 1.8).toFixed(2) + "s";
   const angle = Math.atan2(dy, dx) * 180 / Math.PI;
   star.style.left = startX + "px";
@@ -2181,18 +1756,12 @@ function spawnShootingStar() {
   star.style.setProperty("--dx", dx + "px");
   star.style.setProperty("--dy", dy + "px");
   star.style.setProperty("--dur", dur);
-  star.style.setProperty("--trail-angle", (angle + 180) + "deg"); // points backward along the real path
+  star.style.setProperty("--trail-angle", (angle + 180) + "deg"); // points backward along the path
   bg.appendChild(star);
   setTimeout(() => star.remove(), (parseFloat(dur) * 1000) + 100);
 }
 function scheduleShootingStars() {
-  // Delay-then-spawn (not spawn-then-delay) so the first one doesn't fire
-  // immediately on page load, while everything else is still settling in -
-  // it should feel like a rare thing you happen to catch, not a boot cue.
-  // Was 6-18s (avg ~12s) - Loris asked whether this should be more
-  // frequent; roughly doubled to 3-9s (avg ~6s), still random/staggered
-  // enough to read as an occasional "did you catch that?" moment rather
-  // than a repeating pattern, just noticeably livelier.
-  const next = 3000 + Math.random() * 6000; // 3-9s
+  // Wait before spawning so the first star doesn't appear during boot.
+  const next = 3000 + Math.random() * 6000;
   setTimeout(() => { spawnShootingStar(); scheduleShootingStars(); }, next);
 }

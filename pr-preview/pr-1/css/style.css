@@ -18,19 +18,8 @@
   --safe-bottom:env(safe-area-inset-bottom,0px);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;}
-/* Bug (Loris, mobile): long-pressing a tile's custom artwork (or any other
-   <img> icon) opened the OS-level "save/share image" menu - a plain emoji
-   glyph (what these all used to be, see tierIconNode() etc. in ui.js) never
-   did that, since it's just text, not an image the browser treats as
-   savable media. -webkit-touch-callout is the actual iOS Safari/WKWebView
-   switch for that long-press callout; -webkit-user-drag stops the same
-   image being dragged out on iPad/desktop Safari. pointer-events:none is
-   safe here specifically because NO <img> in this app is ever a click/tap
-   target on its own - every one sits inside a button/cell whose own
-   listener is what actually handles the tap (checked: no code anywhere
-   attaches a listener to an <img> directly) - so removing the img from hit
-   -testing entirely, rather than just suppressing its own long-press menu,
-   is the most robust fix and costs nothing. */
+/* Blocks the iOS long-press "save image" menu and image dragging.
+   pointer-events:none is safe: no <img> is a tap target, taps go to the parent button/cell. */
 img{-webkit-touch-callout:none;-webkit-user-drag:none;pointer-events:none;}
 html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
@@ -43,13 +32,8 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 .star{position:absolute;background:#fff;border-radius:50%;opacity:.6;animation:twinkle 3s ease-in-out infinite;}
 @keyframes twinkle{0%,100%{opacity:.15}50%{opacity:.9}}
 
-/* Occasional shooting star (Loris: "un fond un peu plus vivant, sans être
-   perturbant") - a single streak spawned every 6-18s (random, see
-   scheduleShootingStars in ui.js), travels in a straight diagonal line and
-   fades in/out, then removes itself. --dx/--dy/--dur are set per-instance
-   in JS so each one has a different angle/length/speed. The trail is a
-   ::before pseudo-element (a short gradient line trailing behind the dot)
-   rather than a box-shadow smear, so it reads as a streak, not a blur. */
+/* Shooting star (spawned by scheduleShootingStars, ui.js). --dx/--dy/--dur are set per star.
+   The trail is a ::before gradient line. */
 .shootingStar{position:absolute;width:2px;height:2px;border-radius:50%;background:#fff;
   box-shadow:0 0 6px 1px #fff, 0 0 14px 3px #8b5cf699;
   animation:shootingStarMove var(--dur,1.1s) linear forwards;}
@@ -76,16 +60,7 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 .currency.gems .value{color:var(--gems);}
 .currency.energy .value{color:var(--energy);}
 .currency.energy{flex:0 0 auto;}
-/* Loris: "l'aperçu de la poussière d'étoile et la production [...]
-   actuellement c'est affiché +... [...] en prenant un peu d'espace a
-   l'onglet des gemmes" - stardust needs room for icon+value+the "+X/s"
-   rate suffix, gems only ever shows icon+value (no rate of its own), so
-   giving stardust a bigger share of the space they split lets the rate
-   actually fit instead of ellipsizing to "+…".
-   Later feedback (screenshot): 2:1 gave stardust too much - the gems pill
-   itself now reads as visibly cramped against its own icon+value. Nudged
-   back a little toward gems (still comfortably enough for the rate at
-   realistic production values, just less lopsided than a straight 2:1). */
+/* Stardust gets more room than Gems so its "+X/s" rate fits. */
 .currency.stardust{flex:1.6;}
 .currency.gems{flex:1.2;}
 .currency.gems,.currency.energy,.currency.stardust{cursor:pointer;}
@@ -102,11 +77,6 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
   display:flex;align-items:center;justify-content:center;
   transition:transform .1s ease, border-color .15s ease;}
 .iconBtn:active{transform:scale(.92);border-color:#4a3f94;}
-/* Loris: the restart icon looked off-center and a bit small - it wasn't
-   the artwork (verified near-perfectly centered in its own canvas), it
-   was .iconBtn having no flex/centering at all, so an <img> inside just
-   fell into normal inline flow instead of being centered like the
-   button's text content (☰/✕) roughly was by happenstance. */
 .iconBtn img.uiIcon{width:76%;height:76%;object-fit:contain;}
 
 .toolbar{display:flex;align-items:center;gap:8px;margin-bottom:8px;min-height:40px;flex-wrap:wrap;}
@@ -117,33 +87,17 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 .btn:active{transform:scale(.95);}
 .btn.primary{background:linear-gradient(135deg,var(--accent),#5b21b6);border-color:#a78bfa77;box-shadow:0 4px 14px #8b5cf655, inset 0 1px 0 rgba(255,255,255,.18);}
 .btn.primary .cost{color:#fde68a;}
-/* Two direct-action buttons (Stardust/Gems) instead of one button that
-   opened a choice modal - Loris: "frustrant d'avoir une seconde etape pour
-   invoquer [...] une section invoquer avec en dessous les deux choix". */
 .invokeSection{display:flex;flex-direction:column;gap:3px;}
 .invokeSectionLabel{font-size:10px;font-weight:700;color:var(--text-dim);
   text-transform:uppercase;letter-spacing:.04em;padding-left:2px;}
 .invokeSectionRow{display:flex;gap:6px;}
 .invokeSectionRow .btn{padding:8px 12px;font-size:13px;}
-/* "Échanger deux cases" fab, right next to Invoquer (Loris: c'est un
-   service tres utile, mal mis en avant a 3 taps dans la Boutique - le
-   sortir ici doit a la fois le rendre plus facile a utiliser et donner
-   plus envie de Gems, donc plus envie de regarder les pubs Gems). Same
-   label-then-button shape as .invokeSection, teal accent (matches the
-   Gems currency color) to read as its own distinct action rather than a
-   3rd Invoquer choice. No icon on the button itself (Loris: dropped the
-   🔀 emoji placeholder rather than commission art for it) - the "Échanger"
-   label above already names the action, the Gems cost is the only thing
-   worth an icon here. */
+/* Swap button next to Invoquer. Teal like the Gems currency. */
 .swapSection{display:flex;flex-direction:column;gap:3px;}
 .swapCellsBtn{background:linear-gradient(135deg,#0891b2,#155e75);border-color:#22d3ee77;
   box-shadow:0 3px 12px #0891b255;padding:8px 12px;font-size:13px;}
 .btn.bigbang{background:linear-gradient(135deg,#f59e0b,#dc2626);border-color:#fbbf2477;box-shadow:0 4px 16px #f59e0b66;animation:bigBangPulse 1.4s ease-in-out infinite;}
-/* The Big Bang icon's own warm tones (reds/oranges) blend into this
-   button's orange-to-red gradient (Loris) - a small dark backdrop behind
-   just the icon, only in this one spot, fixes the contrast without
-   touching the artwork (which reads fine everywhere else it's used, on
-   dark backgrounds). */
+/* Dark backdrop so the warm Big Bang icon stands out on the orange button. */
 .btn.bigbang .inlineCurrencyIcon{background:radial-gradient(circle, rgba(0,0,0,.4) 0%, transparent 72%);border-radius:50%;}
 .btn.ghost{background:transparent;border:1px solid #4a3f8c;box-shadow:none;}
 .btn.danger{background:linear-gradient(135deg,#f87171,#7f1d1d);border-color:#fca5a577;}
@@ -163,13 +117,7 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 .cell.locked .lockLabel .emoji img{width:16px;height:16px;object-fit:contain;}
 .cell.selectableEmpty{outline:2px dashed var(--accent2);outline-offset:-2px;}
 .cell.selected{outline:2px solid var(--accent2);outline-offset:-2px;box-shadow:0 0 14px #22d3ee88;}
-/* Continuous idle animation for the max tier (Loris: "les cases de niveau
-   10... une animation agréable, jolie et continue"). box-shadow (not a
-   pseudo-element) so it can't fight with .tile's own paint order/z-index;
-   the icon's own gentle breathing scale is a separate animation on a
-   different element (.tile .emoji.tierIcon), so it coexists cleanly with
-   .tile.merging/.tile.spawnIn firing on top of it right after a fresh
-   merge into the max tier. */
+/* Max-tier idle glow. box-shadow on .cell so it doesn't conflict with .tile animations. */
 .cell.tierMax{animation:tierMaxGlow 2.6s ease-in-out infinite;}
 @keyframes tierMaxGlow{
   0%,100%{box-shadow:0 0 8px 1px #8b5cf655;}
@@ -180,18 +128,12 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 
 .tile{position:absolute;inset:2px;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;
   box-shadow:inset 0 0 10px rgba(255,255,255,.15), 0 2px 6px rgba(0,0,0,.4);transition:transform .12s ease;touch-action:none;
-  z-index:5;/* sits above the flash/burst glow (so it pops "out of" the light) but below the ring/debris flying past it */}
+  z-index:5; /* above the flash/burst, below the ring and debris */}
 .tile .emoji{font-size:22px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5));}
-/* Custom tier artwork (img.tierIcon, see tierIconNode() in ui.js) - the
-   image already carries its own shading/depth, so it skips the emoji
-   drop-shadow (would just double up) and is sized relative to the tile
-   instead of the font-size the plain emoji glyph uses. */
+/* Artwork already has shading: no drop-shadow, sized relative to the tile. */
 .tile .emoji.tierIcon{width:68%;height:68%;object-fit:contain;filter:none;}
 .tile .tierNum{position:absolute;bottom:2px;right:4px;font-size:8px;font-weight:700;color:rgba(255,255,255,.65);}
-/* Cycle loop (Loris: merging two top-tier tiles now loops them back to
-   tier 1 with a per-cycle glow instead of being refused - see
-   applyCycleGlow()/performMerge() economy.js) - opposite corner from
-   .tierNum so they never collide. */
+/* Loop counter badge, in the corner opposite .tierNum. */
 .tile .cycleBadge{position:absolute;top:2px;left:4px;font-size:8px;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,.7);}
 .tile.cycled{animation:cycleGlow 2.2s ease-in-out infinite;}
 @keyframes cycleGlow{
@@ -203,20 +145,9 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
     inset 0 0 14px var(--cycle-color, transparent);}
 }
 .tile.dragging{opacity:0;}
-/* Merging tile: elevated above neighboring cells (see .cell.impactHero
-   below) and given ONE smooth overshoot bounce (single easing curve, no
-   back-and-forth rotation wobble) so it visibly bursts out past its own
-   cell before settling back into place - the "hero" moment of the merge.
-   cubic-bezier(.16,1,.3,1) is a standard "expo-out" curve - reads as a
-   fast, clean deceleration rather than a cartoonish multi-step bounce. */
+/* Merging tile bursts past its cell with a single expo-out overshoot. */
 .tile.merging{animation:mergePop .42s cubic-bezier(.16,1,.3,1);}
-/* box-shadow glow instead of filter:drop-shadow() - drop-shadow rasterizes
-   and blurs the whole element's alpha channel every frame (expensive,
-   noticeably so with several tiles/effects animating at once during a
-   streak); box-shadow is a much cheaper, well-optimized paint operation for
-   the same "glow ring" look here since the tile is already a plain
-   rounded rect. filter:brightness() alone (a simple color multiply) stays,
-   it's cheap. */
+/* box-shadow instead of filter:drop-shadow(): drop-shadow is expensive to animate. */
 @keyframes mergePop{
   0%{transform:scale(.5) rotate(-5deg);filter:brightness(1);
     box-shadow:inset 0 0 10px rgba(255,255,255,.15),0 2px 6px rgba(0,0,0,.4),0 0 0 rgba(251,191,36,0);}
@@ -225,30 +156,20 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
   100%{transform:scale(1) rotate(0deg);filter:brightness(1);
     box-shadow:inset 0 0 10px rgba(255,255,255,.15),0 2px 6px rgba(0,0,0,.4),0 0 0 rgba(251,191,36,0);}
 }
-/* Lifts the whole cell above its neighbors while its tile is mid-bounce
-   (see mergePop above) so the oversized tile isn't clipped/hidden behind
-   the next cells in DOM order - .cell already has overflow:visible. */
+/* Lifts the cell so the oversized tile isn't hidden by the next cells. */
 .cell.impactHero{z-index:20;}
 .tile.spawnIn{animation:spawnIn .25s ease;}
 @keyframes spawnIn{0%{transform:scale(0)}100%{transform:scale(1)}}
 
-/* Cell-unlock pop (Loris: "quand on débloque une case... une animation") -
-   a one-shot pop + gold glow flash on the newly-empty cell, echoing the
-   cadenas/stardust unlock theme. See opts.justUnlocked in renderCell()
-   (ui.js) - only fires on the actual unlock moment, not every re-render. */
+/* One-shot pop on a newly unlocked cell (renderCell's opts.justUnlocked). */
 .cell.unlockPop{animation:unlockPop .6s cubic-bezier(.16,1,.3,1);}
 @keyframes unlockPop{
   0%{transform:scale(.55);box-shadow:0 0 0 0 #fbbf2400;border-color:#fbbf24;}
   45%{box-shadow:0 0 20px 6px #fbbf2488;}
   100%{transform:scale(1);box-shadow:0 0 0 0 transparent;}
 }
-/* "Clicker automatique" (Loris) - .autoClickTarget is the persistent marker
-   on whichever cell it's currently targeting, kept in sync every frame from
-   tickAutoClicker() (input.js, a plain classList.toggle - simpler than
-   threading a re-render hook through every place the grid can change).
-   .autoClickPulse is the brief flash on each actual tap-bonus grant, one
-   per TAP_COOLDOWN_MS (150ms, config.js) - keep the duration within that so
-   each flash reaches its peak before the next one restarts it. */
+/* .autoClickTarget marks the auto-clicker's cell (toggled by tickAutoClicker, input.js).
+   .autoClickPulse flashes on each tap: keep it shorter than TAP_COOLDOWN_MS (150 ms). */
 .cell.autoClickTarget{box-shadow:0 0 0 2px #22d3ee88, 0 0 14px 2px #22d3ee33 inset;}
 .cell.autoClickPulse{animation:autoClickPulse .15s ease-out;}
 @keyframes autoClickPulse{
@@ -264,44 +185,22 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 .ghostTile .emoji.tierIcon{width:70%;height:70%;object-fit:contain;filter:none;}
 
 .floatBonus{position:absolute;left:50%;top:40%;transform:translate(-50%,0);pointer-events:none;z-index:10;
-  /* above .tile's z-index:5 (added for the merge effect's stacking order) -
-     without this the tap-bonus text renders BEHIND the tile and is
-     invisible, which is what made it look like the feature had disappeared. */
+  /* above .tile's z-index:5, otherwise hidden behind the tile */
   font-size:13px;font-weight:800;color:var(--stardust);text-shadow:0 1px 3px rgba(0,0,0,.6);
   animation:floatUp .75s ease-out forwards;white-space:nowrap;}
 @keyframes floatUp{0%{opacity:0;transform:translate(-50%,6px) scale(.8);}20%{opacity:1;transform:translate(-50%,0) scale(1.05);}
   100%{opacity:0;transform:translate(-50%,-26px) scale(1);}}
 
-/* Merge impact effect - see playMeteorMerge() in ui.js. A soft, formless
-   glow swells in place on the destination cell (no traveling sprite - an
-   object visibly flying/sliding onto the cell read as an odd sticker/emoji
-   at this size and speed, not as an effect) and lands almost instantly -
-   the payoff (tile pop, flash, starburst, ring, shake, sparks) has to feel
-   INSTANT since this fires on every single merge, often several per
-   second. Nothing here should read as "waiting". Pure opacity+scale on a
-   blurred radial gradient - no shape/rotation to read as a "thing".
-   --mergeBright/--mergeDark (below, throughout this block) are the landed
-   tile's own TIERS[].from/to colors, set on `cell` (and copied onto
-   .screenFlash, which lives on <body>) by playMeteorMerge() - Loris: "les
-   couleurs devraient pas être les couleurs de la case ?". Was a fixed
-   gold/amber palette regardless of tier; the fallback values after each
-   var() are that old palette, kept only so nothing breaks if a color is
-   somehow never set. */
+/* Merge impact (playMeteorMerge, ui.js). Everything must feel instant: it plays on every merge.
+   --mergeBright/--mergeDark are the tile's gradient colors; the var() fallbacks are defaults. */
 .chargeGlow{position:absolute;top:50%;left:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;
   background:radial-gradient(circle,rgba(255,247,227,.95),rgba(var(--mergeBright,251,191,36),.55) 55%,transparent 75%);
   filter:blur(1.5px);animation:chargeGlow .11s cubic-bezier(.4,0,.2,1) forwards;
   z-index:6;pointer-events:none;}
 @keyframes chargeGlow{0%{transform:scale(.15);opacity:0;}100%{transform:scale(3.2);opacity:.95;}}
 
-/* A flash from the impact point (position:fixed so it isn't clipped by the
-   cell, --fx/--fy are viewport px set by playMeteorMerge in ui.js). Its
-   REACH now scales with --fpower (streak/tier) instead of always covering
-   the whole viewport: a routine merge (the vast majority - low power)
-   stays a small, soft glow near the tile, while only a big combo/high
-   tier actually blooms out to fill the screen. A full-screen flash on
-   EVERY merge (several a second during a streak) washed over unrelated UI
-   (header, buttons) and stopped reading as special - reserving the big
-   version for genuinely big moments is what makes it register as one. */
+/* Flash from the impact point (--fx/--fy in viewport px). Its reach scales with --fpower,
+   so only big merges fill the screen. */
 .screenFlash{position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:80;pointer-events:none;
   background:radial-gradient(circle at var(--fx,50%) var(--fy,45%),
     rgba(255,247,227,calc(.7 * var(--fpower,1))),
@@ -310,16 +209,8 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
   animation:screenFlash .38s ease-out forwards;}
 @keyframes screenFlash{0%{opacity:0;}10%{opacity:1;}100%{opacity:0;}}
 
-/* Starburst rays behind the ring/flash - the classic "satisfying pop"
-   accent (same trick as most match/merge games' candy/gem pops). Each ray
-   is its own thin, gradient-faded, slightly blurred sliver (not a
-   repeating-conic-gradient pinwheel - at this size a conic gradient's
-   wedges get WIDER outward and keep a hard edge along their whole length,
-   which is exactly what read as flat "light rectangles" rather than fine
-   light rays). Alternating long/short rays via spawnBurstRays() in ui.js
-   give it the classic 8-point sparkle look instead of a uniform pinwheel.
-   --ang is the ray's angle, --burstPower scales how far it reaches
-   (streak/tier, see playMeteorMerge in ui.js). */
+/* Starburst: separate thin faded rays (a conic-gradient looked like flat wedges).
+   --ang: ray angle. --burstPower: reach. */
 .burstRay{position:absolute;left:50%;top:50%;width:3.5px;height:36px;margin:-36px -1.75px 0 -1.75px;
   transform-origin:50% 100%;border-radius:2px;pointer-events:none;z-index:2;
   background:linear-gradient(to top,rgba(var(--mergeBright,255,213,120),1),rgba(255,255,255,.6) 45%,transparent 100%);
@@ -342,9 +233,7 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
   animation:impactRing .42s ease-out forwards;}
 @keyframes impactRing{0%{transform:scale(.3);opacity:1;}100%{transform:scale(calc(10.5 * var(--ringPower,1)));opacity:0;}}
 
-/* Whole-grid shake (not just the one cell) - see .grid.gridShake toggled
-   via restartAnim() in ui.js. --shakePower scales the amplitude up for
-   streaks/high tiers so a big fusion visibly rattles the whole board. */
+/* Whole-grid shake. --shakePower scales the amplitude. */
 .grid.gridShake{animation:gridImpactShake .3s cubic-bezier(.36,.07,.19,.97);}
 @keyframes gridImpactShake{
   0%{transform:translate(0,0);}
@@ -354,8 +243,7 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
   100%{transform:translate(0,0);}
 }
 
-/* Mixed rock chips + bright star sparkles, sized per-chip via --chipScale -
-   reads as "the impact released stardust", not just a plain rock explosion. */
+/* Rock chips and sparkles, sized per chip with --chipScale. */
 .debrisChip{position:absolute;left:50%;top:50%;width:6px;height:6px;border-radius:1px;pointer-events:none;z-index:9;
   background:linear-gradient(135deg,rgb(var(--mergeBright,255,207,133)),rgb(var(--mergeDark,124,62,15)));
   animation:debrisFly .52s cubic-bezier(.2,.7,.4,1) forwards;}
@@ -368,14 +256,7 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 }
 
 .quickActions{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;}
-/* Visual pass (menus/buttons batch): rounder pill shape + a faint standing
-   ambient glow (not just on .ready/.featured any more) so the row reads as
-   a cluster of glowing cosmic controls rather than flat grey chips, and a
-   circular icon badge (matches .drawerIcon below) instead of the bare emoji
-   glyph sitting directly on the fab's own background - this badge is also
-   exactly where a future custom icon <img> (see the icônes boutons & menu
-   Midjourney batch) will drop in with zero markup changes, same pattern as
-   tierIconNode()/.emoji.tierIcon in ui.js/style.css. */
+/* Pill-shaped fab with a soft glow and a round icon badge. */
 .fab{flex:0 0 auto;appearance:none;display:flex;align-items:center;gap:8px;padding:7px 14px 7px 7px;border-radius:18px;
   border:1px solid #3a3070;background:linear-gradient(180deg,#241f52,#1a1640);color:var(--text);
   font-size:13px;font-weight:700;box-shadow:0 3px 12px rgba(0,0,0,.4), 0 0 0 1px #8b5cf61a, inset 0 1px 0 rgba(255,255,255,.06);
@@ -398,20 +279,14 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 .fab.active{border-color:var(--stardust);background:linear-gradient(180deg,#3a2a0d,#241f52);}
 .fab.active .fabLabel{color:var(--stardust);font-variant-numeric:tabular-nums;}
 .fab:disabled{opacity:.4;}
-/* One-shot fab discovery pop (Loris: buttons should "apparaître petit à
-   petit lors des premières fusions [...] une animation fait apparaître le
-   bouton") - see revealFab()/FAB_DISCOVERY_FUSIONS (ui.js). */
+/* One-shot pop when a fab first appears (revealFab, ui.js). */
 .fab.fabReveal{animation:fabRevealPop .5s cubic-bezier(.16,1,.3,1);}
 @keyframes fabRevealPop{
   0%{transform:scale(.3);opacity:0;}
   60%{transform:scale(1.12);opacity:1;}
   100%{transform:scale(1);opacity:1;}
 }
-/* Cadeau's own reveal is richer than the shared fabRevealPop above (Loris:
-   "il faut retravailler le design du pop du bouton cadeau [...] trop
-   basique, pas assez design") - it's the very first fab a new player ever
-   sees, so it gets a small wobble + a warm gold glow burst (same #fbbf24
-   as unlockPop/Big Bang, "reward" territory) instead of a plain scale+fade. */
+/* Richer reveal for Cadeau, the first fab a new player sees. */
 .fab.fabReveal.gift{animation:fabRevealGift .7s cubic-bezier(.16,1,.3,1);}
 @keyframes fabRevealGift{
   0%{transform:scale(.2) rotate(-14deg);opacity:0;box-shadow:0 0 0 0 #fbbf2400;}
@@ -429,13 +304,7 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 .bannerAd{height:50px;background:#1a1533;border:1px dashed #3a3070;border-radius:8px;display:flex;
   align-items:center;justify-content:center;font-size:11px;color:var(--text-dim);margin-top:6px;flex-shrink:0;}
 
-/* z-index 110 - ABOVE every overlay (drawer 90, panel 95, modal/tutorial
-   100), not just the header (80 put it BELOW all of them). A toast is
-   meant to always be visible regardless of what else is open - this was
-   silently hiding any toast fired while a full-screen panel was open
-   (e.g. buying Streak Freeze from the shop: the generic "Achat effectue !"
-   toast was rendering, just completely covered by the still-open shop
-   panel behind it - "ca ne fonctionne pas" was really "invisible"). */
+/* z-index 110: above every overlay (drawer 90, panel 95, modals 100), so toasts are always visible. */
 .toastContainer{position:fixed;left:0;right:0;bottom:calc(var(--safe-bottom) + 14px);display:flex;flex-direction:column;
   align-items:center;gap:6px;z-index:110;pointer-events:none;}
 .toast{background:#1c1740ee;border:1px solid #3a3070;padding:8px 14px;border-radius:20px;font-size:13px;
@@ -470,8 +339,7 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
   border-radius:var(--radius);padding:13px 14px;font-size:14px;font-weight:600;text-align:left;display:flex;align-items:center;gap:12px;
   transition:transform .1s ease, background .15s ease, border-color .15s ease;flex-shrink:0;}
 .drawerItem:active{transform:scale(.97);background:#211b4d;border-color:#4a3f94;}
-/* Same circular glowing badge treatment as .fabIcon (both are candidates for
-   the custom icon art batch, and should look like one consistent system). */
+/* Same round badge as .fabIcon. */
 .drawerIcon{width:34px;height:34px;border-radius:50%;flex-shrink:0;font-size:16px;
   display:flex;align-items:center;justify-content:center;
   background:radial-gradient(circle at 35% 30%,#372d70,#211c46 70%);
@@ -485,14 +353,7 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 
 /* Full-screen panel */
 .panelOverlay{position:fixed;inset:0;background:var(--bg-deep);z-index:95;display:flex;justify-content:center;}
-/* Gods screen ambiance (Loris: "trop basique" - the panel used the exact
-   same flat background as every other panel). Toggled via openPanel()
-   (ui.js) only for the "gods" panel. Purple/gold nebula gradients + a
-   faint repeating star-dot texture (2-layer radial-gradient tiling trick,
-   no images) + a slow pulsing glow overlay for a "living" divine-space
-   feel, plus the section headers pick up the gold accent instead of the
-   app's usual cyan. Individual god portraits are a separate, later batch -
-   this is the decor half only. */
+/* Gods panel ambiance: nebula gradients, star-dot texture, pulsing glow, gold headers. */
 .panelOverlay.godsTheme{
   background:
     radial-gradient(ellipse 120% 50% at 50% -5%, #6d3fa855 0%, transparent 60%),
@@ -531,14 +392,8 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 .card.compact p.desc{font-size:11px;margin-bottom:6px;}
 .card h3{margin:0 0 4px;font-size:14px;}
 
-/* Premium shop cards ("Offres Premium") - EVERY card in this section now
-   shares this gold-glow chrome + a continuous pulse (Loris liked the
-   Pass's look enough to want it applied to every service, not just the
-   top 3 - "le texte y est beaucoup plus clair... applique-le à tous les
-   services"). .iapHero (the Pass) layers a bigger/brighter variant with
-   its badge + perks list on top of this shared base - same two classes on
-   one element (see ui.js), .iapHero's rules win the shared properties
-   just by coming later in the cascade (equal specificity, source order). */
+/* Gold premium look shared by every "Offres Premium" card. .iapHero (the Pass) overrides
+   it by coming later in the file. */
 .iapCard{position:relative;border-color:#f7b73377;
   box-shadow:0 2px 8px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.05), 0 0 0 1px #f7b73322;
   animation:iapGlowSmall 3.2s ease-in-out infinite;}
@@ -574,7 +429,7 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 .shopGrid2 .card .tag{font-size:9px;}
 .shopGrid2 .card .btn{padding:7px;font-size:11px;margin-top:8px;}
 
-/* Emoji/Illustré switch, above the Sets d'icônes grid (renderShopPanel) */
+/* Emoji/Illustrated toggle */
 .iconStyleToggle{display:flex;gap:8px;}
 .iconStyleToggle .btn{flex:1;justify-content:center;padding:8px;font-size:12.5px;}
 .cosmeticGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
@@ -590,24 +445,10 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 .cosmeticTile .btn{padding:7px 10px;font-size:11px;width:auto;min-width:70px;}
 .cosmeticPreviewBtn{padding:5px 10px;font-size:10.5px;width:auto;min-width:0;margin-top:2px;}
 
-/* Skin preview modal ("👁 Aperçu") - a static mini grid of all 10 tiers
-   with the previewed set's icons, each tile given a gentle staggered pulse
-   (--stagger, set per-cell in openSkinPreviewModal/ui.js) so the whole
-   grid reads as "alive" rather than a flat catalog image, without going
-   as far as simulating actual merges. */
-/* Bug (Loris): opening "Aperçu" from the skin MANAGER popup
-   (openSkinManagerModal) - as opposed to from the shop panel - rendered
-   the preview BEHIND the still-open manager popup. Every .modalOverlay
-   shares z-index:100, so with both open at once, whichever comes later in
-   the DOM (skinManagerModal, declared after this one in index.html) just
-   painted on top regardless of open order. #skinPreviewModal is the only
-   modal that can currently be opened from within another modal, so it
-   gets a dedicated higher z-index instead of relying on DOM order at all. */
+/* Skin preview: mini grid of every tier with a staggered pulse (--stagger).
+   Opened from inside other modals, so it needs a higher z-index than the shared 100. */
 #skinPreviewModal{z-index:101;}
-/* Same DOM-order stacking issue as skinPreviewModal above - confirmActionModal
-   (openConfirmModal, ui.js) can be opened from on top of several other
-   modals (Boutique panel, skin manager, fusion promo, remove-ads promo, the
-   god ritual picker), so it needs to always win regardless of DOM order. */
+/* Can open on top of other modals (shop, skin manager, promos, god picker). */
 #confirmActionModal{z-index:102;}
 .skinPreviewCard{max-width:360px;}
 .skinPreviewGrid{display:grid;grid-template-columns:repeat(5, 1fr);gap:8px;margin:4px 0 16px;}
@@ -617,16 +458,12 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
   50%{box-shadow:0 0 10px 2px #8b5cf655;transform:scale(1.04);}
 }
 
-/* Was a plain ✅ emoji sized via font-size - now the valide.png crystal
-   checkmark, sized explicitly on the <img> itself instead. */
 .purchaseCheckAnim{line-height:1;margin:6px auto 10px;animation:cosmicBoxReveal .4s ease-out;}
 .purchaseCheckAnim img{width:56px;height:56px;object-fit:contain;}
 .cosmicBoxCard{text-align:center;}
 .cosmicBoxAnim{font-size:52px;line-height:1;margin:10px auto 16px;width:88px;height:88px;
   display:flex;align-items:center;justify-content:center;border-radius:20px;
   background:radial-gradient(circle at 35% 30%, #2a2450, #14102a);border:2px solid #3a3070;}
-/* God portrait (godPortraitHtml, ui.js) filling the reveal badge - was a
-   plain emoji glyph sized via the badge's own font-size. */
 .cosmicBoxPortrait{width:76px;height:76px;object-fit:contain;}
 .cosmicBoxAnim.spinning{animation:cosmicBoxSpin .6s ease-in-out infinite;}
 @keyframes cosmicBoxSpin{0%,100%{transform:scale(1) rotate(0deg);}50%{transform:scale(1.12) rotate(8deg);}}
@@ -635,17 +472,7 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
   animation:cosmicBoxReveal .4s ease-out;}
 @keyframes cosmicBoxReveal{0%{transform:scale(.4);opacity:0;}70%{transform:scale(1.15);}100%{transform:scale(1);opacity:1;}}
 
-/* ---- Secret 4-egg challenge (Loris) - see EASTER_EGGS (config.js),
-   revealEasterEgg()/openEggFinaleModal() (ui.js). ---- */
-/* Loris: "les sections de textes de chaque fragment dans l'onglet secret
-   sont trop collé les uns sur les autres, il faudrait un espacement entre
-   chaque section/bloc" - #secretsList (renderSecretsModal, ui.js) is a
-   plain div of stacked .card elements with no gap of their own (unlike
-   .panelBody, which gives every sliding-panel list this same gap for free
-   - this list lives in a .modalCard instead, which doesn't). */
-/* Loris: "le dernier fragment de secret [...] est collé au bouton Fermer" -
-   the gap above only applies BETWEEN the .card children, nothing separated
-   the list itself from its next sibling (#secretsClose). */
+/* ---- Secret 4-egg challenge (see EASTER_EGGS in config.js) ---- */
 #secretsList{display:flex;flex-direction:column;gap:10px;margin:4px 0 12px;}
 .eggPipsRow{display:flex;gap:8px;justify-content:center;margin:4px 0 14px;font-size:20px;letter-spacing:2px;}
 .eggPip{color:#3a3070;transition:color .3s ease;}
@@ -657,22 +484,10 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
   100%{transform:scale(1);}
 }
 .eggFoundCard{text-align:center;}
-/* Now an <img> (secret-egg.png), not a font-size emoji glyph -
-   width/height replace font-size as the sizing knob. */
 .eggFoundIcon{display:block;width:64px;height:64px;object-fit:contain;margin:4px auto 8px;animation:cosmicBoxReveal .4s ease-out;}
 
-/* Grand finale - deliberately NOT a plain .modalCard (Loris: "l'animation
-   la plus impressionnante jamais proposée", the single biggest moment in
-   the game). Higher z-index than every other modal, fullscreen dark
-   backdrop, its own staged reveal (.eggFinaleStage.revealed added ~1.4s
-   after opening, once the burst/shake have already landed) instead of
-   everything popping in at once. */
-/* .modalOverlay.eggFinaleOverlay (not just .eggFinaleOverlay): the shared
-   .modalOverlay,.tutOverlay base rule (style.css, further down) sets its
-   own background/z-index at the same specificity (one class each) - as the
-   later rule in the file it would otherwise win regardless of this rule's
-   own declarations, leaving the finale see-through and under other modals.
-   The compound selector's higher specificity guarantees this one wins. */
+/* Grand finale: fullscreen, above every modal, with a staged reveal (.eggFinaleStage.revealed).
+   Compound selector so it beats the later .modalOverlay base rule. */
 .modalOverlay.eggFinaleOverlay{z-index:300;background:radial-gradient(circle at 50% 40%,#1a0f3a,#020103 75%);overflow:hidden;}
 .eggFinaleStage{position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;
   max-width:380px;width:100%;padding:20px;}
@@ -732,9 +547,7 @@ body.eggFinaleShake{animation:eggFinaleShake .55s cubic-bezier(.36,.07,.19,.97);
   80%{transform:translate(4px,3px);}
 }
 
-/* Exclusive profile cosmetic (Loris: reward #2, not a tile skin) - a
-   rotating prismatic ring around the drawer avatar, only for a player who
-   found all 4 secrets (renderDrawerHead, ui.js). */
+/* Profile ring reward for finding all 4 secrets (renderDrawerHead, ui.js). */
 .drawerLogo.mythicFrame{position:relative;}
 .drawerLogo.mythicFrame::before{content:"";position:absolute;inset:-4px;border-radius:14px;
   background:conic-gradient(from 0deg,#f472e0,#fbbf24,#38bdf8,#f472e0);
@@ -746,38 +559,19 @@ body.eggFinaleShake{animation:eggFinaleShake .55s cubic-bezier(.36,.07,.19,.97);
 .storyCard h3{font-size:14px;color:#e8e4ff;}
 .storyCard.locked{opacity:.5;}
 .storyCard.locked h3{color:var(--text-dim);}
-/* Now an <img> (bigbang.png), not a font-size emoji glyph - width/height
-   replace font-size as the sizing knob, everything else (faint corner
-   watermark) stays the same. */
 .storyMark{position:absolute;top:10px;right:14px;width:40px;height:40px;object-fit:contain;opacity:.12;pointer-events:none;}
 .card p.desc{margin:0 0 8px;font-size:12px;color:var(--text-dim);line-height:1.5;white-space:pre-line;}
 .card .rowBetween,.modalCard .rowBetween{display:flex;align-items:center;justify-content:space-between;gap:8px;}
-/* stardustInfoBestRow (openStardustInfoModal, ui.js) switches to this when
-   the value is the long "pas encore de record" sentence instead of a short
-   duration - a full sentence doesn't fit rowBetween's side-by-side layout
-   without visually misaligning against the label (Loris). */
+/* Stacked layout when the value is a full sentence. */
 .modalCard .rowBetween.stack{flex-direction:column;align-items:flex-start;gap:2px;}
 .modalCard .rowBetween.stack strong{font-size:12px;font-weight:600;color:var(--text-dim);}
-/* min-width:0 lets the title shrink/wrap inside the flex row instead of
-   forcing the row (and, without this, the whole grid card - see
-   .shopGrid2 .card below) wider than its column. Deliberately NOT
-   white-space:nowrap here any more - that was tried first (see git log)
-   but broke any card with a longer title and no .tag pill next to it
-   ("🚀 Boost x2 production (10 min)", "💎 Pub contre Gems (+10)": nothing
-   left could shrink, so the whole card pushed past the screen edge on
-   mobile). Letting the title wrap normally across 2 lines instead, while
-   pinning the .tag pill itself (below) so IT specifically never wraps,
-   fixes both the original "50 💎 on two lines" bug and this one at once. */
+/* min-width:0 lets the title wrap so the card never grows wider than its column. */
 .card .rowBetween h3{min-width:0;}
 .shopGrid2 .card{min-width:0;}
-/* Price/status pill (e.g. "50 💎") - on narrow screens a long title (like
-   "Échanger deux cases") left too little room and the flex row shrank the
-   pill itself, wrapping the number and the emoji onto separate lines. The
-   title now truncates with an ellipsis first (see rule above) instead, and
-   the pill is pinned to never wrap or shrink below its own content. */
+/* The pill never wraps or shrinks. */
 .tag{font-size:10px;padding:2px 7px;border-radius:8px;background:#2a2450;color:var(--text-dim);white-space:nowrap;flex-shrink:0;}
 .tag.owned{background:#134e2c;color:var(--success);}
-/* Pass Supernova's daily-Gems value-comparison badge (passGemsValueBadgeText, ui.js). */
+/* Pass daily Gems value badge (passGemsValueBadgeText, ui.js) */
 .tag.value{background:#4a3a12;color:var(--stardust);margin-left:4px;}
 .tag.equipped{background:#3730a3;color:#c7d2fe;}
 
@@ -786,12 +580,7 @@ body.eggFinaleShake{animation:eggFinaleShake .55s cubic-bezier(.36,.07,.19,.97);
 
 .skillRow .rowBetween{margin-top:6px;}
 .skillLevel{font-size:11px;color:var(--text-dim);}
-/* Ascension/Alchimie Stellaire (renderSkillsPanel/renderRunUpgradesPanel,
-   ui.js) - Loris: "des blocs 2 par 2" instead of one card per row. Same
-   compact-card overrides as .shopGrid2 (min-width:0 so a long button
-   label can't force its column wider than the grid, reduced padding/font
-   sizes so descriptions and the Alchimie Actuel/Prochain readout still
-   fit at half width). */
+/* Ascension and Alchimie cards, 2 per row. min-width:0 and smaller text so they fit at half width. */
 .skillGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:stretch;}
 .skillGrid .card{padding:10px;min-width:0;display:flex;flex-direction:column;}
 .skillGrid .card h3{font-size:12.5px;margin-bottom:3px;}
@@ -799,12 +588,7 @@ body.eggFinaleShake{animation:eggFinaleShake .55s cubic-bezier(.36,.07,.19,.97);
 .skillGrid .skillLevel{font-size:10px;}
 .skillGrid .card .btn{padding:8px;font-size:11.5px;margin-top:auto;}
 .skillGrid .skillEffects{font-size:10px;flex-direction:column;gap:2px;}
-/* Ascension AND Alchimie Stellaire cards (renderSkillsPanel/
-   renderRunUpgradesPanel, ui.js) - current vs next-level effect readout,
-   so a player can see what they already have and what the next purchase
-   actually buys, not just a generic per-level desc line. Was
-   .runUpgradeEffects (Alchimie-only name) before Ascension got the same
-   treatment. */
+/* Current vs next-level effect on Ascension and Alchimie cards. */
 .skillEffects{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 10px;font-size:11px;margin:0 0 8px;}
 .skillEffects .effectCurrent{color:var(--text-dim);}
 .skillEffects .effectNext{color:var(--accent2);font-weight:700;}
@@ -832,33 +616,21 @@ body.eggFinaleShake{animation:eggFinaleShake .55s cubic-bezier(.36,.07,.19,.97);
 .modalCard h3,.tutCard h3{margin:0 0 8px;font-size:17px;color:var(--accent2);}
 .modalCard p{margin:0 0 10px;font-size:13px;line-height:1.5;color:var(--text-dim);white-space:pre-line;}
 .modalCard .modalWarn{color:#fca5a5;font-size:11px;}
-/* Tier artwork mentioned inline in text (the tutorial, stat lines...) -
-   see tierInlineIconHtml() in ui.js. */
+/* Tier artwork inline in text (tierInlineIconHtml, ui.js) */
 .inlineTierIcon{width:18px;height:18px;object-fit:contain;vertical-align:-4px;margin:0 1px;}
-/* God portrait mentioned inline next to its name (Histoire panel's "Ton
-   Dieu du moment" card title) - see godPortraitHtml() in ui.js. Round,
-   unlike the tier art above, since these are face portraits. */
+/* God portrait inline next to a name. Round because it's a face. */
 .godInlineIcon{width:24px;height:24px;object-fit:contain;object-position:top;border-radius:50%;
   vertical-align:-6px;margin:0 1px;}
-/* Gems/Cosmic Energy currency glyph (currencyIconHtml, ui.js) - reuses the
-   gems_ad.png/ascension.png fab artwork as a small inline symbol wherever
-   those currencies are shown in text (header pills, shop prices, skill
-   costs...), not just on their own dedicated fab button. */
+/* Currency icon inline in text (currencyIconHtml, ui.js) */
 .inlineCurrencyIcon{width:16px;height:16px;object-fit:contain;vertical-align:-3px;margin:0 1px;}
 .currency .icon .inlineCurrencyIcon{width:20px;height:20px;vertical-align:-5px;margin:0;}
-/* Stardust's 3-sparkle cluster reads smaller than a single solid shape at
-   the same box size (its "mass" is split across 3 separate points instead
-   of filling the frame) - Loris found it too small on mobile even after
-   recomposing it bigger. A bit more display size on top of that, just for
-   this icon, everywhere it appears inline. */
+/* The 3-sparkle Stardust icon looks small at the same size, so it gets a bigger box. */
 .inlineCurrencyIcon[src*="stardust.png"]{width:19px;height:19px;}
 .currency .icon .inlineCurrencyIcon[src*="stardust.png"]{width:24px;height:24px;}
 .confirmDontAskRow{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-dim);margin-top:4px;cursor:pointer;}
 .confirmDontAskRow input{width:16px;height:16px;accent-color:var(--accent2);flex-shrink:0;}
 .modalBtns{display:flex;gap:8px;margin-top:10px;}
-/* The wheel modal has a standalone "Fermer" button right after its
-   .modalBtns spin-buttons row - .modalCard isn't a flex/gap container, so
-   with no margin of its own it sat flush against the row above it. */
+/* .modalCard has no gap, so the button needs its own margin. */
 #wheelClose{margin-top:10px;}
 .modalBtns .btn{flex:1;justify-content:center;}
 .saveCodeText{width:100%;box-sizing:border-box;background:#0c0920;border:1px solid #2a2450;border-radius:10px;
@@ -887,47 +659,27 @@ body.eggFinaleShake{animation:eggFinaleShake .55s cubic-bezier(.36,.07,.19,.97);
 .dayCell.today{outline:2px solid var(--accent2);}
 .dayCell .dNum{font-size:9px;color:var(--text-dim);}
 
-/* Wheel + legend side by side (Loris: on-wheel labels never read cleanly
-   across 3 rounds of trying - "je pense qu'on devrait enlever les
-   indications sur la roue elle-même et les mettre à côté"). Wheel shrunk
-   140->150px isn't needed since the legend just takes the remaining flex
-   space instead of a fixed width - wraps to stacked (legend below) only if
-   the modal itself is ever narrower than the two need side by side. */
+/* Wheel and legend side by side; wraps to stacked on narrow modals. */
 .wheelLayout{display:flex;align-items:center;gap:14px;margin:10px 0;flex-wrap:wrap;}
 .wheelWrap{position:relative;width:150px;height:150px;flex-shrink:0;}
-/* Background is set inline via buildWheelSegments() (ui.js), computed from
-   WHEEL_PRIZES' real weights - a slice's visual size now actually matches
-   its real odds, which the old hand-picked CSS angles didn't. A radial
-   highlight is layered under the conic-gradient there too, for a bit of
-   glossy shine (Loris: "améliore un peu le design de la roue").
-   overflow:hidden clips the dividers to the circle so nothing pokes out
-   past the rim; .wheelPointer is a sibling in .wheelWrap, unaffected. */
+/* Background is set by buildWheelSegments() (ui.js) from WHEEL_PRIZES weights.
+   overflow:hidden clips the dividers to the circle. */
 .wheel{width:100%;height:100%;border-radius:50%;border:4px solid var(--accent);
   position:relative;overflow:hidden;box-shadow:0 0 0 2px #05040a, 0 4px 20px rgba(0,0,0,.5);
   transition:transform 3.5s cubic-bezier(.17,.67,.2,1);display:flex;align-items:center;justify-content:center;font-size:11px;}
-/* Thin radial divider "clock hands" between slices - one per boundary
-   angle, rotated to that angle via inline style in buildWheelSegments().
-   transform-origin:top center keeps the pivot pinned at the wheel's exact
-   center regardless of rotation (standard pie-chart-divider trick). */
+/* Divider lines between slices, rotated around the wheel center. */
 .wheelDivider{position:absolute;left:50%;top:50%;width:1px;height:50%;
   background:rgba(5,4,10,.5);transform-origin:top center;pointer-events:none;z-index:1;}
 .wheelHub{position:absolute;left:50%;top:50%;width:22px;height:22px;margin:-11px 0 0 -11px;
   border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff8e6,var(--accent2) 55%,var(--accent) 100%);
   box-shadow:0 0 0 2px #05040a,0 2px 8px rgba(0,0,0,.5);pointer-events:none;z-index:3;}
 .wheelPointer{position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:20px;color:var(--accent2);}
-/* Prize list, one row per slice, built alongside the wheel's own conic-
-   gradient in buildWheelSegments() (ui.js) so the swatch colors always
-   match exactly. Full label text now (no space constraint off the wheel
-   any more), so e.g. "Fragment de skin" reads in full instead of "Skin". */
+/* Prize legend; swatch colors match the slices (buildWheelSegments, ui.js). */
 .wheelLegend{display:flex;flex-direction:column;gap:7px;flex:1;min-width:120px;}
 .wheelLegendItem{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--text);}
 .wheelLegendSwatch{width:11px;height:11px;border-radius:3px;flex-shrink:0;box-shadow:0 0 0 1px rgba(255,255,255,.2);}
 .wheelLegendItem .inlineCurrencyIcon{width:15px;height:15px;vertical-align:-3px;}
-/* Reserves the result line's own height from the moment the modal opens
-   (Loris: "je préférerai que l'espace soit déjà prévu au moment où la
-   popup s'ouvre" - #wheelResult starts empty and only gets its text once
-   the spin lands, so without this the whole modal card visibly grew at
-   that exact moment instead of staying a fixed size throughout). */
+/* Reserve the result line so the modal doesn't grow when the spin lands. */
 #wheelResult{min-height:20px;}
 
 /* Ad / IAP simulation overlay */
@@ -956,9 +708,6 @@ body.eggFinaleShake{animation:eggFinaleShake .55s cubic-bezier(.36,.07,.19,.97);
 .godTile.locked{opacity:.5;border-color:#2a2450;}
 .godTile.equipped{box-shadow:0 0 0 1px var(--accent2) inset, 0 0 14px #22d3ee44;}
 .godTileEmoji{font-size:30px;line-height:1;}
-/* Custom god portrait (godPortraitHtml, ui.js) filling the same spot a
-   30px emoji glyph used to occupy - given real character art now, this
-   gets to be noticeably bigger without unbalancing the tile. */
 .godTilePortrait{width:54px;height:54px;object-fit:contain;}
 .godTileName{font-size:11px;font-weight:700;text-align:center;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
 .godTileTitle{font-size:9px;color:var(--text-dim);text-align:center;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
@@ -968,10 +717,7 @@ body.eggFinaleShake{animation:eggFinaleShake .55s cubic-bezier(.36,.07,.19,.97);
 .godTop{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
 .godEmoji{width:42px;height:42px;border-radius:12px;background:#1a1640;display:flex;align-items:center;
   justify-content:center;font-size:22px;flex-shrink:0;border:1px solid #2a2450;}
-/* The detail modal is the closest thing to a "profile view" a god gets -
-   worth showing its portrait much bigger than the 42px generic badge
-   above (was a 52x52 inline-style override before real portraits
-   existed). */
+/* Bigger portrait in the detail modal. */
 .godDetailEmoji{width:96px;height:96px;border-radius:18px;font-size:44px;}
 .godDetailPortrait{width:88px;height:88px;object-fit:contain;}
 .godNames{flex:1;min-width:0;}
@@ -987,17 +733,12 @@ body.eggFinaleShake{animation:eggFinaleShake .55s cubic-bezier(.36,.07,.19,.97);
 .godPower{margin-top:10px;padding-top:10px;border-top:1px solid #2a2450;}
 .godPowerLabel{font-size:11px;color:var(--text-dim);}
 
-/* Side-by-side (un dieu bienveillant, un dieu déchu) rather than the old
-   vertical single-column list - the ritual now always grants exactly 2
-   gods at once (Séléna + Zéphar, see openGodPickerModal/ui.js), so this is
-   a real left/right choice, not a scrollable list. */
+/* Two gods side by side (benevolent and fallen). */
 .godRitualList{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}
 .godRitualCard{background:var(--bg-card);border:1px solid var(--accent2);border-radius:14px;padding:14px 10px;
   display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;appearance:none;color:var(--text);width:100%;}
 .godRitualCard:active{transform:scale(.98);}
-/* Tints matching the same blue/red used for the two camps in the Histoire
-   panel (renderStoryPanel) - the choice should read at a glance, not just
-   via the emoji. */
+/* Same blue/red as the two camps in the Histoire panel. */
 .godRitualCard.bienveillant{border-color:#93c5fd88;box-shadow:0 0 14px #93c5fd22;}
 .godRitualCard.dechu{border-color:#fca5a588;box-shadow:0 0 14px #fca5a522;}
 .godRitualCard .godEmoji{width:44px;height:44px;font-size:24px;margin-bottom:2px;}

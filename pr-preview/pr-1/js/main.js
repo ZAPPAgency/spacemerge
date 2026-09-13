@@ -1,30 +1,8 @@
 // Godspark - boot sequence & main loop
 "use strict";
 
-// Legacy defensive code: early in this project's life the game was
-// prototyped as a Claude Artifact, embedded cross-origin inside claude.ai's
-// own iframe. On iOS Safari, a cross-origin iframe only gets persistent
-// localStorage after an explicit grant via the Storage Access API - and that
-// grant does not reliably survive a full browser/app restart, which caused
-// real save loss in that context. The real fix, since then, is that the
-// game no longer needs that context at all: it's hosted top-level on GitHub
-// Pages (see README.md) and, going forward, ships as a Capacitor native app
-// (native-bridge.js) using @capacitor/preferences instead of localStorage
-// entirely - neither has this problem, since `window.self === window.top`
-// on GitHub Pages and there is no iframe/ITP model on native at all.
-//
-// This function is kept as a harmless no-op safety net (the `embedded`
-// check below is false in both of today's real deployments, so it returns
-// immediately) rather than removed outright, in case the game is ever
-// re-embedded in some other cross-origin host later. A previous version
-// blocked boot behind a mandatory tap that called
-// document.requestStorageAccess() - removed because that call's actual
-// requirements (the embedding iframe's `sandbox` attribute needing
-// `allow-storage-access-by-user-activation`) were never under this game's
-// control anyway, so the tap gate was pure friction with zero guaranteed
-// effect. See docs/SAVE_BACKUP.md and the in-app "Sauvegarde manuelle"
-// export/import in the Réglages panel for the manual-backup mitigation that
-// was actually needed during the Artifact-prototype period.
+// Asks for storage access when the game runs inside a cross-origin iframe, where
+// iOS Safari may not persist localStorage. No-op on GitHub Pages and native builds.
 function requestStorageAccessBestEffort() {
   const embedded = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
   if (!embedded || !document.hasStorageAccess || !document.requestStorageAccess) return;
@@ -54,43 +32,22 @@ function requestStorageAccessBestEffort() {
     skipCellArmed: false,
     swapArmed: false,
     swapFirstIdx: null,
-    // Set when the current armed swap was earned by watching an ad (Loris:
-    // offer that instead of a dead-end "Pas assez de Gems." when clicking
-    // Échanger without enough Gems) - handleSwapTap (input.js) reads this to
-    // skip the Gems cost entirely for this one swap.
+    // The armed swap was paid with an ad: handleSwapTap skips the Gems cost once.
     swapFree: false,
-    // "Choisis une case" mode for the auto-clicker's target pick
-    // (armAutoClickerPicker/handleAutoClickerPick, input.js) - same
-    // in-memory, tap-only-mode pattern as swapArmed/skipCellArmed above.
+    // Waiting for the player to pick the auto-clicker's target cell.
     autoClickerArmed: false,
-    // An ad was watched for the next auto-clicker activation but no cell has
-    // been picked yet (onAutoClickerClick, input.js) - lets a cancelled picker
-    // be reopened without watching another ad.
+    // Ad already watched but no cell picked yet: reopening the picker is free.
     autoClickerPaid: false,
-    // Queued god ids awaiting their unlock-reveal modal (Loris: "il n'y a
-    // pas de pop up quand on débloque un nouveau dieu hormis pour les deux
-    // premiers") - unlockGod() (gods.js) pushes here, maybeOpenGodRevealModal()
-    // (ui.js) consumes one at the next safe moment, same pattern as
-    // Game.pendingGodRitual/pendingPromo below.
+    // God ids waiting for their unlock modal (maybeOpenGodRevealModal, ui.js).
     pendingGodReveals: [],
-    // How many merges have landed within MERGE_STREAK_WINDOW_MS of each
-    // other (see attemptMerge in input.js) - scales the impact effect and
-    // raises the reward chime's pitch a step each time, so chaining merges
-    // fast feels increasingly rewarding rather than just repetitive.
+    // Merges chained within MERGE_STREAK_WINDOW_MS; raises the combo chime.
     mergeStreak: 0,
     lastMergeAt: 0,
-    // Rolling window of recent merge timestamps for the "La Cascade" easter
-    // egg (EASTER_EGG_CHAIN_COUNT/MS, config.js) - in-memory only, unrelated
-    // to mergeStreak above (that one's about the *visual* streak effect,
-    // this one's a real detection window pruned in attemptMerge).
+    // Recent merge timestamps for the "La Cascade" easter egg (EASTER_EGG_CHAIN_*).
     mergeChainTimes: [],
     pendingOfflineGain: null,
     bigBangPromptShown: hasUniverseTile(state), // don't re-prompt on reload if a Universe tile already existed last save
-    // Which fabs have already played their one-shot discovery pop
-    // animation this session (revealFab/FAB_DISCOVERY_FUSIONS, ui.js) -
-    // intentionally in-memory only, not saved: a returning player whose
-    // fusions count already clears every threshold just sees them all pop
-    // in once on this load, rather than the animation never playing again.
+    // Fabs that played their reveal animation. Not saved, so it replays once per launch.
     fabRevealed: new Set(),
   });
 
@@ -107,15 +64,8 @@ function requestStorageAccessBestEffort() {
 
   const gainInfo = computeOfflineGain(state, Date.now());
   const spawnedAtBoot = applyOfflineAutoSpawns(state, gainInfo.cappedMs);
-  // Claim the offline window immediately by refreshing lastSaveTime, BEFORE
-  // any resume event can run. `pageshow` always fires right after load and is
-  // wired to handleAppResume() below - without this, that guaranteed first
-  // resume recomputed the exact same elapsed span (nothing had saved yet: the
-  // tick-save needs ~1s, the autosave 5s) and applied it a second time.
-  // applyOfflineAutoSpawns() is not idempotent, so that meant double
-  // meteorites and double "autoSpawns" quest progress on every cold start
-  // after an absence. The `resuming` flag below can't catch it - it guards
-  // simultaneous events, not a sequential boot-then-pageshow pair.
+  // Save now to refresh lastSaveTime: `pageshow` fires right after load and would
+  // otherwise apply the same offline spawns a second time.
   saveState(state);
 
   renderAll();
@@ -126,17 +76,10 @@ function requestStorageAccessBestEffort() {
   } else if (gainInfo.gain >= 1) {
     openOfflineModal(gainInfo, spawnedAtBoot);
   } else {
-    // Safety net: checkGodMilestones(state) above could in principle have
-    // just queued a reveal (e.g. an imported save code that already clears
-    // a milestone) - in the ordinary case (unlocks happen mid-merge/mid-run)
-    // this is a no-op, the queue is still empty at boot.
+    // checkGodMilestones() above may have queued a reveal (e.g. imported save).
     maybeOpenGodRevealModal();
   }
-  // Loris: "j'aimerais que ce soit bien un pop up qui apparaisse devant
-  // l'écran [...] pas simplement une petite bannière en bas" - unconditional
-  // (not nested above): a brand new player on the tutorial branch can never
-  // have Game.pendingVipGems set anyway (no VIP before ever finishing the
-  // tutorial), so this only ever does something for a returning VIP player.
+  // Outside the branches: only a returning VIP can have pending Gems.
   maybeOpenVipGemsModal();
 
   let lastFrame = performance.now();
@@ -182,28 +125,15 @@ function requestStorageAccessBestEffort() {
   // away instead of crediting it. This computes the catch-up on resume too,
   // and resets lastFrame so the next tick doesn't also try to claim that gap.
   //
-  // Wired to BOTH visibilitychange AND focus/pageshow (not just
-  // visibilitychange alone): mobile Safari/WKWebView don't reliably fire
-  // visibilitychange on every "switched to another app, then back" cycle -
-  // this was reported as auto-spawns simply not resuming after a
-  // backgrounding that didn't fully close the app. saveState() at the end
-  // makes repeat calls safe (lastSaveTime is current by the time a second,
-  // redundant event fires, so it computes ~0 elapsed and no-ops).
+  // Also wired to focus/pageshow: WKWebView doesn't always fire visibilitychange.
+  // The final saveState() makes a duplicate event compute ~0 elapsed.
   //
-  // Only a real absence counts as "offline". focus/pageshow also fire when
-  // nothing was ever paused - pageshow right after every load, focus after
-  // any desktop blur, or when a native rewarded ad hands focus back - and
-  // while the main loop runs it tick-saves every second, so lastSaveTime is
-  // at most ~1s old there. Treating that sliver as an absence popped an
-  // offline modal reading "Temps écoulé : 1s +N" for any player past ~2
-  // Stardust/s (Loris' "1sec - 1 stardust" report), and on desktop re-paid
-  // production the loop had already granted. Below this threshold the gap
-  // is simply left alone; a backgrounding that short loses a few seconds of
-  // half-rate production at most.
+  // focus/pageshow also fire without a real absence (after load, after an ad).
+  // Gaps under OFFLINE_RESUME_MIN_MS are ignored so the loop's production isn't paid twice.
   const OFFLINE_RESUME_MIN_MS = 10000;
   let resuming = false;
   function handleAppResume() {
-    if (resuming) return; // re-entrancy guard - visibilitychange+focus can fire back to back
+    if (resuming) return; // visibilitychange and focus can fire back to back
     resuming = true;
     unmuteAllAudio();
     if (Game.settings.music) MusicService.start();
@@ -213,17 +143,17 @@ function requestStorageAccessBestEffort() {
     if (info.elapsedMs >= OFFLINE_RESUME_MIN_MS) {
       const spawned = applyOfflineAutoSpawns(Game.state, info.cappedMs);
       if (spawned > 0) renderAll();
-      if (info.gain >= 1) openOfflineModal(info, spawned); // adds to a still-uncollected gain rather than replacing it - see openOfflineModal
+      if (info.gain >= 1) openOfflineModal(info, spawned); // adds to an uncollected gain
     }
     maybeOpenVipGemsModal();
     lastFrame = performance.now();
-    saveState(Game.state); // refreshes lastSaveTime so a redundant resume event is a no-op
+    saveState(Game.state);
     resuming = false;
   }
   function handleAppHide() {
     saveState(Game.state);
-    MusicService.stop(); // stop scheduling further chords/sparkles
-    muteAllAudio(); // clean fade of EVERYTHING currently sounding (SFX included) instead of the OS abruptly cutting it mid-envelope (the "bizarre"/dull click on close)
+    MusicService.stop();
+    muteAllAudio(); // fade out all sounds, otherwise the OS cut makes an audible click
   }
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") handleAppHide();
