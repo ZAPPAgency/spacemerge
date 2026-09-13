@@ -116,7 +116,7 @@ function buyRunUpgrade(state, key) {
   if (level >= branch.maxLevel) return { ok: false, reason: "max" };
   const cost = runUpgradeCost(key, level + 1);
   if (state.stardust < cost) return { ok: false, reason: "funds", cost };
-  state.stardust -= cost;
+  spendStardust(state, cost); // not a bare `-=`: spendStardust also feeds the "Dépense N Stardust" daily quests
   state.runUpgrades[key] += 1;
   return { ok: true, cost, newLevel: state.runUpgrades[key] };
 }
