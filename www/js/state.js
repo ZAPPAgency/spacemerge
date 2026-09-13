@@ -154,7 +154,10 @@ function defaultState() {
     // (openAutoClickerIntroModal, ui.js) must only ever play once, ever.
     autoClicker: { targetIdx: null, activeUntil: 0, freeUsedDate: null, tutorialShown: false },
 
-    iap: { removeAds: false, vipUntil: 0, ownedSkinPacks: [], stardustBoost: false, vipLastGemsDay: null },
+    // starterPack: owned flag for the one-time starter_pack (IAP_CATALOG, type
+    // "nonconsumable") - without it neither the shop nor the 40-fusion promo
+    // could tell it had already been bought. See isOneTimeIapOwned() below.
+    iap: { removeAds: false, vipUntil: 0, ownedSkinPacks: [], stardustBoost: false, starterPack: false, vipLastGemsDay: null },
 
     settings: { sound: true, music: true, notifications: true },
     firstPlayedDay: todayStr(),
@@ -265,6 +268,18 @@ function totalProduction(state) {
 
 function isVipActive(state) { return state.iap.vipUntil > Date.now(); }
 function adsRemoved(state) { return state.iap.removeAds || isVipActive(state); }
+// One-time purchases the player already owns, so they are neither shown in
+// the shop nor pitched again by a promo (and a repeat purchase can't
+// re-grant them). Consumables (Gems packs) and the subscription are not
+// one-time and always return false here.
+function isOneTimeIapOwned(state, productId) {
+  switch (productId) {
+    case "remove_ads": return state.iap.removeAds;
+    case "stardust_boost": return state.iap.stardustBoost;
+    case "starter_pack": return state.iap.starterPack;
+    default: return false;
+  }
+}
 // VIP's "débloque tous les skins" perk is a subscription benefit, not a
 // permanent grant - it must stop working the moment vipUntil lapses, so it's
 // checked here rather than pushed into ownedSkins (which never expires).

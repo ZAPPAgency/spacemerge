@@ -993,6 +993,10 @@ async function onBuyIAP(productId) {
   switch (productId) {
     case "remove_ads": state.iap.removeAds = true; break;
     case "starter_pack":
+      // Non-consumable: a repeat purchase must not stack another 500 Gems,
+      // 3 cells and 1h of clicker on top of the first.
+      if (state.iap.starterPack) break;
+      state.iap.starterPack = true;
       state.gems += 500; state.lifetime.gemsEarned += 500;
       { const locked = []; for (let i = 0; i < TOTAL; i++) if (!state.unlocked[i]) locked.push(i);
         for (let k = 0; k < 3 && locked.length; k++) { const pick = locked.splice(Math.floor(Math.random() * locked.length), 1)[0]; state.unlocked[pick] = true; state.extraUnlockedCount += 1; } }

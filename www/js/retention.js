@@ -75,7 +75,7 @@ function checkFusionPromo(state) {
   // forever (fusions only ever goes up) - the promptsShown flag is what
   // actually guarantees "fires at most once", so >= just keeps retrying on
   // every fusion until the gap has elapsed too.
-  if (state.lifetime.fusions >= 40 && !state.promptsShown.starterPack
+  if (state.lifetime.fusions >= 40 && !state.promptsShown.starterPack && !isOneTimeIapOwned(state, "starter_pack")
     && daysBetween(state.firstPlayedDay, todayStr()) <= 2 && promoGapElapsed(state)) {
     state.promptsShown.starterPack = true;
     markPromoShown(state);
