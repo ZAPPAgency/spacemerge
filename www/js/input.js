@@ -355,8 +355,7 @@ function maybeOpenFusionPromo() {
 //     TAP_COOLDOWN_MS = 150ms that's ~6-7 tap beeps per second and ~6-7 full
 //     JSON.stringify + localStorage writes per second, for 10 minutes
 //     straight. The main loop already saves every tick (~1s, main.js), so
-//     nothing is lost; the sound is instead played by tickAutoClicker on the
-//     same throttle as the visual pulse.
+//     nothing is lost. The auto-clicker plays no sound at all.
 //   - spawn a floating "+N ✨" per fire, i.e. ~4000 DOM nodes over a full
 //     window with ~5 always overlapping the target cell. tickAutoClicker
 //     sums them instead and shows one total on that same throttle.
@@ -839,8 +838,9 @@ function handleAutoClickerPick(idx) {
 // Called every frame from main.js's loop. grantTapBonus (above) already
 // gates itself on the cell's own TAP_COOLDOWN_MS via Game.cooldownUntil, so
 // this can just call it every frame without any extra throttling of its
-// own - it silently no-ops between real ticks. All three pieces of feedback
-// (the pulse, the tap sound and the floating "+N ✨") are throttled together,
+// own - it silently no-ops between real ticks. The clicker is silent (no tap
+// sound at all); both visual pieces of feedback (the pulse and the floating
+// "+N ✨") are throttled together,
 // well below that cadence (Loris: "pas trop agressif mais de quand même
 // visible") - the underlying Stardust grants stay fast, only the feedback is
 // calmed down. The floating number shows everything earned since the last
@@ -864,7 +864,6 @@ function tickAutoClicker() {
   autoClickerPendingBonus += grantTapBonus(idx, { auto: true });
   if (autoClickerPendingBonus > 0 && now - autoClickerLastPulseAt >= AUTO_CLICKER_PULSE_MIN_GAP_MS) {
     autoClickerLastPulseAt = now;
-    Sfx.tap();
     spawnFloatingBonus(idx, autoClickerPendingBonus);
     autoClickerPendingBonus = 0;
     playAutoClickEffect(idx);
