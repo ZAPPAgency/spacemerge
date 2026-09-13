@@ -457,9 +457,21 @@ function updateFabs() {
   // updateFabs() call (i.e. constantly). No custom art exists yet for the
   // "claimed today" streak/fire state, so that one still falls back to a
   // plain emoji - but the default gift state now stays as the real image.
+  //
+  // Only written when the state actually changes, like every other fab here:
+  // updateFabs() runs every frame, and rebuilding this <img> - which covers
+  // most of the button - ~60 times a second meant a tap could start on one
+  // image and end on its replacement, which some browsers don't count as a
+  // click, so the daily modal sometimes failed to open.
   const dailyIcon = dom.fabDailyLogin.querySelector(".fabIcon");
-  dailyIcon.innerHTML = claimedToday ? '<img class="uiIcon" src="assets/ui/flamme.png" alt="">' : '<img class="uiIcon" src="assets/ui/cadeau.png" alt="">';
-  dom.fabDailyLogin.querySelector(".fabLabel").textContent = claimedToday ? `Série ${state.dailyLogin.streak}` : "Cadeau";
+  const dailyIconKey = claimedToday ? "claimed" : "gift";
+  if (dailyIcon.dataset.state !== dailyIconKey) {
+    dailyIcon.innerHTML = claimedToday ? '<img class="uiIcon" src="assets/ui/flamme.png" alt="">' : '<img class="uiIcon" src="assets/ui/cadeau.png" alt="">';
+    dailyIcon.dataset.state = dailyIconKey;
+  }
+  const dailyLabel = dom.fabDailyLogin.querySelector(".fabLabel");
+  const dailyLabelText = claimedToday ? `Série ${state.dailyLogin.streak}` : "Cadeau";
+  if (dailyLabel.textContent !== dailyLabelText) dailyLabel.textContent = dailyLabelText;
   // Loris: the Série state read as flat/plain - reuses the same warm-gold
   // "active" treatment .fab.active already has for the Boost fab, instead
   // of only the icon+text changing.
