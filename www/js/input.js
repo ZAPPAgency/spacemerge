@@ -1170,7 +1170,11 @@ function wireEvents() {
   $("fabAutoClicker").addEventListener("click", onAutoClickerClick);
   $("autoClickerIntroPick").addEventListener("click", () => {
     $("autoClickerIntroModal").classList.add("hidden");
-    armAutoClickerPicker();
+    // Through onAutoClickerClick, not straight to armAutoClickerPicker: the
+    // intro only opens when the fab is first revealed, but the Boutique card
+    // can already have spent today's free use (or have one still running) by
+    // then - arming the picker directly handed out a second free 10 minutes.
+    onAutoClickerClick();
   });
   $("fabUnlockCellAd").addEventListener("click", onUnlockCellAd);
   dom.fabSwapCells.addEventListener("click", onSwapCellsClick);
