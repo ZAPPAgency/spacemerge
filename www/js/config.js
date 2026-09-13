@@ -466,9 +466,10 @@ const NORMAL_GODS_COUNT = GODS.filter(g => !g.secret).length;
 //   Bang time is tier 1 or UNIVERSE_TIER, nothing in between.
 // - merge_chain: attemptMerge (input.js) - EASTER_EGG_CHAIN_COUNT merges
 //   land within EASTER_EGG_CHAIN_MS of each other.
-// - second_loop: performMerge (economy.js) - a tile reaches cycle 2 (two
-//   tier-14 tiles merging for the *second* time - Loris: "atteindre le
-//   tier 2 (deux case de niveau 14 du tier de base qui fusionne)").
+// - second_loop: performMerge (economy.js) - a tile reaches cycle 1, i.e.
+//   two base-cycle Genèse (tier 14) merging - Loris: "atteindre le tier 2
+//   (deux case de niveau 14 du tier de base qui fusionne)". He counts loops
+//   from 1, so his "tier 2" / "deuxième boucle" is cycle 1 in code.
 const EASTER_EGGS = [
   { id: "restart_at_top", name: "Le Renoncement",
     hint: "Un choix que peu osent faire, à l'instant où tout semblait acquis.",
