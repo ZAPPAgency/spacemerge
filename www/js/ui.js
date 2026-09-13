@@ -490,7 +490,9 @@ function updateFabs() {
   const now = Date.now();
   const ac = state.autoClicker;
   const autoClickerActive = ac.activeUntil > now;
-  const autoClickerFree = !autoClickerActive && isAutoClickerFreeAvailable(state);
+  // "Free" here means no ad needed for the next activation: today's free use,
+  // or one already paid for with an ad (Game.autoClickerPaid, input.js).
+  const autoClickerFree = !autoClickerActive && (isAutoClickerFreeAvailable(state) || Game.autoClickerPaid);
   const justRevealedAutoClicker = revealFab("fabAutoClicker", fusions >= FAB_DISCOVERY_FUSIONS.fabAutoClicker);
   $("fabAutoClicker").classList.toggle("ready", autoClickerFree);
   $("fabAutoClicker").classList.toggle("active", autoClickerActive);
@@ -956,11 +958,13 @@ function renderShopPanel() {
   const ac = state.autoClicker;
   const autoClickerActive = ac.activeUntil > Date.now();
   const autoClickerFree = !autoClickerActive && isAutoClickerFreeAvailable(state);
+  const autoClickerPaid = !autoClickerActive && !autoClickerFree && Game.autoClickerPaid; // ad already watched, cell not picked yet (onAutoClickerClick, input.js)
   const autoClickerCard = el("div", "card compact");
   autoClickerCard.innerHTML = `<div class="rowBetween"><h3><img class="inlineCurrencyIcon" src="assets/ui/boost.png" alt=""> Clicker Automatique (10 min)</h3></div>
     <p class="desc">${autoClickerActive ? `Actif encore ${formatDuration(ac.activeUntil - Date.now())}` :
-      (autoClickerFree ? "Ton clicker gratuit du jour t'attend. Choisis une case, il tapera dessus tout seul pendant 10 minutes." : "Ton clicker gratuit du jour est déjà utilisé. Regarde une publicité pour le relancer.")}</p>`;
-  const autoClickerBtn = el("button", "btn primary full", autoClickerActive ? "Actif" : (autoClickerFree || adsRemoved(state) ? "Choisir ma case" : "Regarder une pub"));
+      (autoClickerFree ? "Ton clicker gratuit du jour t'attend. Choisis une case, il tapera dessus tout seul pendant 10 minutes." :
+        (autoClickerPaid ? "Ta publicité est déjà regardée. Choisis une case pour lancer le clicker." : "Ton clicker gratuit du jour est déjà utilisé. Regarde une publicité pour le relancer."))}</p>`;
+  const autoClickerBtn = el("button", "btn primary full", autoClickerActive ? "Actif" : (autoClickerFree || autoClickerPaid || adsRemoved(state) ? "Choisir ma case" : "Regarder une pub"));
   autoClickerBtn.disabled = autoClickerActive;
   autoClickerBtn.addEventListener("click", onAutoClickerClick);
   autoClickerCard.appendChild(autoClickerBtn);

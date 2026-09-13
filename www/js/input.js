@@ -801,19 +801,30 @@ function onWatchGemsAd() {
 // after the free/ad gate, tap-only like the Échanger picker (Game.swapArmed).
 function onAutoClickerClick() {
   const state = Game.state;
-  if (Game.autoClickerArmed) { Game.autoClickerArmed = false; toast("Sélection annulée."); renderAll(); return; }
+  if (Game.autoClickerArmed) {
+    Game.autoClickerArmed = false;
+    toast(Game.autoClickerPaid ? "Sélection annulée. Ta publicité reste acquise." : "Sélection annulée.");
+    renderAll();
+    return;
+  }
   const now = Date.now();
   if (state.autoClicker.activeUntil > now) {
     toast("Clicker déjà actif encore " + formatDuration(state.autoClicker.activeUntil - now));
     return;
   }
-  if (isAutoClickerFreeAvailable(state)) { armAutoClickerPicker(); return; }
+  // Game.autoClickerPaid: an ad was already watched for this activation but
+  // no cell was picked yet. Cancelling the picker (a second tap on this fab
+  // or its Boutique card - easy to do by accident, since tapping a locked or
+  // empty cell keeps the picker open) used to drop it, and the next tap asked
+  // for a whole new ad. The earned activation now waits until it's used.
+  if (isAutoClickerFreeAvailable(state) || Game.autoClickerPaid) { armAutoClickerPicker(); return; }
   confirmThenWatchAd(state, "Clicker automatique",
     "Ton clicker gratuit du jour est déjà utilisé. Regarde une publicité pour le relancer tout de suite, pour 10 minutes de plus.",
     async () => {
       if (!adsRemoved(state)) toast("📺 Chargement de la publicité...");
       const ok = await watchRewardedAd(state, "auto_clicker");
       if (!ok) return;
+      Game.autoClickerPaid = true;
       armAutoClickerPicker();
     });
 }
@@ -827,6 +838,7 @@ function handleAutoClickerPick(idx) {
   const state = Game.state;
   if (!state.unlocked[idx] || !state.grid[idx]) { toast("Choisis une case débloquée avec une tuile."); Sfx.error(); return; }
   Game.autoClickerArmed = false;
+  Game.autoClickerPaid = false; // the watched ad (if any) is spent now, see onAutoClickerClick
   activateAutoClicker(state, idx);
   Sfx.purchase();
   toast("🤖 Clicker automatique activé pour 10 min !");
