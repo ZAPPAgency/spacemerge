@@ -1,4 +1,4 @@
-# Godspark
+# Spacemerge
 
 Jeu merge/idle/prestige spatial, prévu pour iOS via Capacitor. Ce dépôt
 contient **tout le projet** : code source, config Capacitor, assets,
