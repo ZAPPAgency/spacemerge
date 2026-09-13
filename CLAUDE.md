@@ -83,6 +83,10 @@ UI text is French (`lang="fr"`), English localization is planned.
 - No new dependency without asking.
 
 **Comments** (production-ready, written for a junior developer)
+- English only, in every file type (JS, CSS, HTML, YAML). Player-facing strings stay French.
+- Concise: short plain sentences, no narrative, no filler ("deliberately", "exactly", "genuinely").
+  Point to the related code (`fn()` in `file.js`) instead of re-explaining it.
+- Trailing comments: a few words (`// must match .wheel's CSS transition duration`).
 - Explain WHY or a non-obvious rule, never WHAT the code already says.
 - Comment: business rules, formulas, magic thresholds, platform quirks, ordering constraints, invariants.
 - Don't comment: obvious code, getters, one-line helpers.
@@ -95,6 +99,11 @@ UI text is French (`lang="fr"`), English localization is planned.
 ```js
 // Bad:  Loris reported the swap was free, so we check gems here (was missing before v117)
 // Good: A swap bought with an ad skips the gem cost exactly once.
+
+// Bad:  Merges landing within this window of each other count as a "streak" - scales the
+//       impact effect and raises the reward chime's pitch a step each time, so fast merge
+//       chains feel increasingly rewarding. Resets the moment the player pauses.
+// Good: Merges closer than this count as a streak (raises the combo chime, see Sfx.meteorImpact).
 ```
 
 ## 5. Mobile / Capacitor best practices (iOS + Android)
