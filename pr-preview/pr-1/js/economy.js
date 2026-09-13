@@ -38,8 +38,11 @@ function performBigBang(state) {
   checkThanatosChallenge(state); // must run before the grid resets - it checks the current grid's fill state
   // Easter egg "Les Extrêmes" (Loris) - every filled cell is tier 1 or
   // UNIVERSE_TIER, nothing in between. Must read the grid before freshGrid()
-  // replaces it below.
-  const pureExtremes = state.grid.every(t => !t || t.tier === 1 || t.tier === UNIVERSE_TIER);
+  // replaces it below. Compared on tileProgressTier() for the same reason
+  // hasUniverseTile() above is: a looped tile reads as `tier: 1` while really
+  // sitting above Genèse, so on raw tier it would pass as a "commencement"
+  // and hand out the egg for a grid that is not extremes-only at all.
+  const pureExtremes = state.grid.every(t => !t || tileProgressTier(t) === 1 || tileProgressTier(t) === UNIVERSE_TIER);
   const eggResult = pureExtremes ? unlockEasterEgg(state, "pure_extremes") : null;
   const minEnergy = getGodEffects(state).bigBangMinEnergy || 0;
   const gain = Math.max(previewBigBangGain(state), minEnergy);

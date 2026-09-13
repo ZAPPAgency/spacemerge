@@ -728,8 +728,22 @@ function invokeCost(k) {
 // pushing into the new 11-14 tiers (TIERS/UNIVERSE_TIER, config.js), adds
 // up fast instead of being capped at one flat number regardless of how
 // many you have.
+//
+// The 1.4x escalation only runs to the top of TIERS (Genèse, 14) - the range
+// Loris' "11 rapporte plus que 10 mais moins que 12" actually describes.
+// Past that, progress comes from the infinite loop (`cycle`, performMerge in
+// economy.js), which by design never ends, so continuing to compound would
+// let Cosmic Energy run away: a single cycle-1 Genèse would already be worth
+// ~6100 (vs 50 for a cycle-0 Genèse), two loops would trivialise the whole
+// permanent SKILL_TREE, and far enough out Math.pow returns Infinity and
+// poisons state.cosmicEnergy for good. Each tier beyond Genèse therefore
+// adds a flat BIG_BANG_LOOP_TIER_BONUS instead: still strictly increasing,
+// still a real reward for looping, but linear rather than explosive.
+const BIG_BANG_LOOP_TIER_BONUS = 25;
 function bigBangTileWeight(tier) {
-  return Math.round(13 * Math.pow(1.4, tier - UNIVERSE_TIER));
+  const escalating = Math.min(tier, TIERS.length);
+  const looped = Math.max(0, tier - TIERS.length);
+  return Math.round(13 * Math.pow(1.4, escalating - UNIVERSE_TIER)) + looped * BIG_BANG_LOOP_TIER_BONUS;
 }
 // How far a tile really is along the progression, flattening the infinite
 // loop (`cycle`, see performMerge in economy.js) back onto a single scale:

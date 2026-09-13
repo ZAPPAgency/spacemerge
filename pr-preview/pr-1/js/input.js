@@ -201,6 +201,11 @@ function handleLockedTap(idx) {
     if (result.ok) {
       renderCell(idx, { justUnlocked: true }); // layer the unlock-pop animation on top of the plain renderAll() paint
       triggerResonanceIfLucky(state);
+      // Résonance bumps extraUnlockedCount, i.e. unlockCost() for every cell
+      // still locked - and it fires AFTER the renderAll() above, so without
+      // this they keep advertising the old, cheaper price. Same call the
+      // other two unlock paths already make (tryUnlock, onUnlockCellAd).
+      refreshLockedCellPrices();
     }
     saveState(state);
     return;
@@ -334,10 +339,14 @@ function maybeOpenFusionPromo() {
   setTimeout(() => openFusionPromoModal(kind), 700);
 }
 
+// Returns the Stardust actually granted, or 0 when the tap did nothing (cell
+// on cooldown, or empty). The amount is always > 0 on a real fire - tierProd
+// is at least 0.5 and every multiplier is >= 1 - so callers can test it as a
+// plain boolean.
+//
 // `opts.auto` marks a tap the PLAYER did not make - the auto-clicker's own
-// per-frame tick (tickAutoClicker below). The Stardust, the quest progress
-// and the floating number are identical either way; what an automated tap
-// must NOT do is:
+// per-frame tick (tickAutoClicker below). The Stardust and the quest progress
+// are identical either way; what an automated tap must NOT do is:
 //   - reset the Erebus streak. That challenge is "fusionne 35 fois d'affilée
 //     sans jamais appuyer sur une case" - appuyer, i.e. the player pressing.
 //     Letting the clicker reset it made the challenge unprogressable during
@@ -348,23 +357,25 @@ function maybeOpenFusionPromo() {
 //     straight. The main loop already saves every tick (~1s, main.js), so
 //     nothing is lost; the sound is instead played by tickAutoClicker on the
 //     same throttle as the visual pulse.
+//   - spawn a floating "+N ✨" per fire, i.e. ~4000 DOM nodes over a full
+//     window with ~5 always overlapping the target cell. tickAutoClicker
+//     sums them instead and shows one total on that same throttle.
 function grantTapBonus(idx, opts) {
   const now = performance.now();
-  if (Game.cooldownUntil[idx] > now) return false;
+  if (Game.cooldownUntil[idx] > now) return 0;
   const state = Game.state;
   const tile = state.grid[idx];
-  if (!tile) return false;
+  if (!tile) return 0;
   const auto = opts && opts.auto;
   const bonus = 5 * effectiveTileProd(state, tile.tier);
   grantStardust(state, bonus);
   updateQuestProgress(state, "tapBonuses", 1);
   if (!auto) resetErebusStreak(state);
   Game.cooldownUntil[idx] = now + TAP_COOLDOWN_MS;
-  if (!auto) Sfx.tap();
-  spawnFloatingBonus(idx, bonus);
+  if (!auto) { Sfx.tap(); spawnFloatingBonus(idx, bonus); }
   updateHeader();
   if (!auto) saveState(state);
-  return true;
+  return bonus;
 }
 
 // "Résonance des Cases" run upgrade (RUN_UPGRADE_TREE, config.js) - rolled
@@ -828,13 +839,17 @@ function handleAutoClickerPick(idx) {
 // Called every frame from main.js's loop. grantTapBonus (above) already
 // gates itself on the cell's own TAP_COOLDOWN_MS via Game.cooldownUntil, so
 // this can just call it every frame without any extra throttling of its
-// own - it silently no-ops between real ticks. The visual pulse
-// (playAutoClickEffect) AND the tap sound are throttled together, well below
-// that cadence (Loris: "pas trop agressif mais de quand même visible") - the
-// underlying Stardust grants stay fast, only the feedback is calmed down.
-// `{ auto: true }` also keeps grantTapBonus from resetting the Erebus streak
-// or saving on every single fire - see its comment above.
+// own - it silently no-ops between real ticks. All three pieces of feedback
+// (the pulse, the tap sound and the floating "+N ✨") are throttled together,
+// well below that cadence (Loris: "pas trop agressif mais de quand même
+// visible") - the underlying Stardust grants stay fast, only the feedback is
+// calmed down. The floating number shows everything earned since the last
+// beat rather than one lone tick's worth, so the throttle never understates
+// what the clicker is actually paying out. `{ auto: true }` also keeps
+// grantTapBonus from resetting the Erebus streak, playing a sound or saving
+// on every single fire - see its comment above.
 let autoClickerLastPulseAt = 0;
+let autoClickerPendingBonus = 0;
 const AUTO_CLICKER_PULSE_MIN_GAP_MS = 900;
 function tickAutoClicker() {
   const state = Game.state;
@@ -842,12 +857,16 @@ function tickAutoClicker() {
   const idx = ac.targetIdx;
   const isActive = idx !== null && ac.activeUntil > Date.now();
   if (idx !== null && cellEls[idx]) cellEls[idx].classList.toggle("autoClickTarget", isActive);
-  if (!isActive || !state.grid[idx]) return; // inactive, or paused - the target cell is currently empty
+  // Inactive, or paused because the target cell is currently empty. Drop any
+  // unshown remainder so it can't surface as a stale total on the next run.
+  if (!isActive || !state.grid[idx]) { autoClickerPendingBonus = 0; return; }
   const now = performance.now();
-  const fired = grantTapBonus(idx, { auto: true });
-  if (fired && now - autoClickerLastPulseAt >= AUTO_CLICKER_PULSE_MIN_GAP_MS) {
+  autoClickerPendingBonus += grantTapBonus(idx, { auto: true });
+  if (autoClickerPendingBonus > 0 && now - autoClickerLastPulseAt >= AUTO_CLICKER_PULSE_MIN_GAP_MS) {
     autoClickerLastPulseAt = now;
     Sfx.tap();
+    spawnFloatingBonus(idx, autoClickerPendingBonus);
+    autoClickerPendingBonus = 0;
     playAutoClickEffect(idx);
   }
 }
@@ -914,6 +933,11 @@ function onBuyGemItem(itemId) {
     if (Game.state.gems < SHOP_GEM_ITEMS.find(i => i.id === "swapCells").cost) { Sfx.error(); toast("Pas assez de Gems."); return; }
     Game.swapArmed = true;
     Game.swapFirstIdx = null;
+    // This entry point is the PAID swap. swapFree is only cleared when a swap
+    // actually completes (handleSwapTap), so an ad-earned free swap that was
+    // armed and then abandoned would still be flagged free here and hand out
+    // this purchase for nothing.
+    Game.swapFree = false;
     closePanel();
     toast("Choisis deux cases à échanger.");
     renderAll();
