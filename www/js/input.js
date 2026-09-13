@@ -672,29 +672,31 @@ function spinVisual(prizeIndex, cb) {
   scheduleWheelTicks(WHEEL_SPIN_MS);
   setTimeout(cb, WHEEL_SPIN_MS);
 }
+// Shared landing step for both spins below - renderAll() rather than just
+// updateHeader/updateFabs because the "1 case débloquée" prize (WHEEL_PRIZES,
+// retention.js) mutates state.unlocked. Without a grid re-render the cell the
+// player just won kept drawing as locked, at its old price, until some
+// unrelated action happened to redraw it - and tapping it went straight to
+// handleTap, silently "selecting" a cell that still looked locked. Same
+// reason onDailyClaim() calls renderAll() for this very reward type.
+function finishWheelSpin(prize) {
+  $("wheelResult").innerHTML = prize ? `Gagné : ${withCurrencyIcons(prize.label)}` : "Déjà utilisé aujourd'hui.";
+  Sfx.wheelWin();
+  refreshWheelButtons();
+  renderAll();
+  saveState(Game.state);
+}
 function onWheelSpinFree() {
   $("wheelSpinFree").disabled = true; $("wheelSpinAd").disabled = true;
   const prize = spinWheel(Game.state, false);
-  spinVisual(prize ? WHEEL_PRIZES.indexOf(prize) : 0, () => {
-    $("wheelResult").innerHTML = prize ? `Gagné : ${withCurrencyIcons(prize.label)}` : "Déjà utilisé aujourd'hui.";
-    Sfx.wheelWin();
-    refreshWheelButtons();
-    updateHeader(); updateFabs();
-    saveState(Game.state);
-  });
+  spinVisual(prize ? WHEEL_PRIZES.indexOf(prize) : 0, () => finishWheelSpin(prize));
 }
 async function onWheelSpinAd() {
   $("wheelSpinFree").disabled = true; $("wheelSpinAd").disabled = true;
   const ok = await watchRewardedAd(Game.state, "wheel_bonus");
   if (!ok) { refreshWheelButtons(); return; }
   const prize = spinWheel(Game.state, true);
-  spinVisual(prize ? WHEEL_PRIZES.indexOf(prize) : 0, () => {
-    $("wheelResult").innerHTML = prize ? `Gagné : ${withCurrencyIcons(prize.label)}` : "Déjà utilisé aujourd'hui.";
-    Sfx.wheelWin();
-    refreshWheelButtons();
-    updateHeader(); updateFabs();
-    saveState(Game.state);
-  });
+  spinVisual(prize ? WHEEL_PRIZES.indexOf(prize) : 0, () => finishWheelSpin(prize));
 }
 
 // ---------------- Unlock cell fab (rewarded ad) ----------------
