@@ -356,9 +356,7 @@ function maybeOpenFusionPromo() {
 //     JSON.stringify + localStorage writes per second, for 10 minutes
 //     straight. The main loop already saves every tick (~1s, main.js), so
 //     nothing is lost. The auto-clicker plays no sound at all.
-//   - spawn a floating "+N ✨" per fire, i.e. ~4000 DOM nodes over a full
-//     window with ~5 always overlapping the target cell. tickAutoClicker
-//     sums them instead and shows one total on that same throttle.
+// The floating "+N ✨" is still shown on every fire, automated or not.
 function grantTapBonus(idx, opts) {
   const now = performance.now();
   if (Game.cooldownUntil[idx] > now) return 0;
@@ -371,7 +369,8 @@ function grantTapBonus(idx, opts) {
   updateQuestProgress(state, "tapBonuses", 1);
   if (!auto) resetErebusStreak(state);
   Game.cooldownUntil[idx] = now + TAP_COOLDOWN_MS;
-  if (!auto) { Sfx.tap(); spawnFloatingBonus(idx, bonus); }
+  if (!auto) Sfx.tap();
+  spawnFloatingBonus(idx, bonus);
   updateHeader();
   if (!auto) saveState(state);
   return bonus;
@@ -838,44 +837,29 @@ function handleAutoClickerPick(idx) {
 // Called every frame from main.js's loop. grantTapBonus (above) already
 // gates itself on the cell's own TAP_COOLDOWN_MS via Game.cooldownUntil, so
 // this can just call it every frame without any extra throttling of its
-// own - it silently no-ops between real ticks. The clicker is silent (no tap
-// sound at all); both visual pieces of feedback (the pulse and the floating
-// "+N ✨") are throttled together,
-// well below that cadence (Loris: "pas trop agressif mais de quand même
-// visible") - the underlying Stardust grants stay fast, only the feedback is
-// calmed down. The floating number shows everything earned since the last
-// beat rather than one lone tick's worth, so the throttle never understates
-// what the clicker is actually paying out. `{ auto: true }` also keeps
-// grantTapBonus from resetting the Erebus streak, playing a sound or saving
-// on every single fire - see its comment above.
-let autoClickerLastPulseAt = 0;
-let autoClickerPendingBonus = 0;
-const AUTO_CLICKER_PULSE_MIN_GAP_MS = 900;
+// own - it silently no-ops between real ticks. Every real fire gets its own
+// pulse and floating "+N ✨" (no sound), so the feedback matches the actual
+// tap cadence. `{ auto: true }` also keeps grantTapBonus from resetting the
+// Erebus streak, playing a sound or saving on every single fire - see its
+// comment above.
 function tickAutoClicker() {
   const state = Game.state;
   const ac = state.autoClicker;
   const idx = ac.targetIdx;
   const isActive = idx !== null && ac.activeUntil > Date.now();
   if (idx !== null && cellEls[idx]) cellEls[idx].classList.toggle("autoClickTarget", isActive);
-  // Inactive, or paused because the target cell is currently empty. Drop any
-  // unshown remainder so it can't surface as a stale total on the next run.
-  if (!isActive || !state.grid[idx]) { autoClickerPendingBonus = 0; return; }
-  const now = performance.now();
-  autoClickerPendingBonus += grantTapBonus(idx, { auto: true });
-  if (autoClickerPendingBonus > 0 && now - autoClickerLastPulseAt >= AUTO_CLICKER_PULSE_MIN_GAP_MS) {
-    autoClickerLastPulseAt = now;
-    spawnFloatingBonus(idx, autoClickerPendingBonus);
-    autoClickerPendingBonus = 0;
-    playAutoClickEffect(idx);
-  }
+  if (!isActive || !state.grid[idx]) return; // inactive, or paused because the target cell is currently empty
+  if (grantTapBonus(idx, { auto: true })) playAutoClickEffect(idx);
 }
+// No timer to strip the class afterwards: a pending one from the previous
+// fire (TAP_COOLDOWN_MS earlier) would cut the next pulse short, and a
+// finished non-looping animation leaves no visual trace anyway.
 function playAutoClickEffect(idx) {
   const cell = cellEls[idx];
   if (!cell) return;
   cell.classList.remove("autoClickPulse");
   void cell.offsetWidth; // force reflow so re-adding the class restarts the animation even if it's still finishing
   cell.classList.add("autoClickPulse");
-  setTimeout(() => cell.classList.remove("autoClickPulse"), 500);
 }
 // Loris: "ajouter une demande de confirmation quand on clique sur le
 // bouton échanger [...] possible d'annuler ou de confirmer mais aussi de
