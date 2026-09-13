@@ -731,11 +731,23 @@ function invokeCost(k) {
 function bigBangTileWeight(tier) {
   return Math.round(13 * Math.pow(1.4, tier - UNIVERSE_TIER));
 }
+// How far a tile really is along the progression, flattening the infinite
+// loop (`cycle`, see performMerge in economy.js) back onto a single scale:
+// a cycle-1 tier-1 tile is the product of two tier-14 tiles, so it sits
+// ABOVE tier 14, not below tier 2. Everything that asks "how high has this
+// tile climbed" - Big Bang eligibility (hasUniverseTile, economy.js) and its
+// payout weight below - must use this rather than `tile.tier`, which drops
+// back to 1 at every loop boundary.
+function tileProgressTier(tile) {
+  return tile.tier + (tile.cycle || 0) * TIERS.length;
+}
 function bigBangGain(stardustEarnedThisRun, grid) {
   const base = Math.floor(Math.sqrt(stardustEarnedThisRun / 500000));
   let tierBonus = 0;
   for (const t of grid) {
-    if (t && t.tier >= UNIVERSE_TIER) tierBonus += bigBangTileWeight(t.tier);
+    if (!t) continue;
+    const progress = tileProgressTier(t);
+    if (progress >= UNIVERSE_TIER) tierBonus += bigBangTileWeight(progress);
   }
   return Math.max(1, base + tierBonus);
 }

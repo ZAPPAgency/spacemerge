@@ -8,8 +8,15 @@
 // a fixed reference instead of "whatever the current ceiling is" - reaching
 // Univers or anything higher keeps Big Bang available for the rest of the
 // run, however far past it the player pushes.
+//
+// Compared against tileProgressTier() (config.js), not the raw t.tier: the
+// infinite loop added by performMerge() below sends a tile's tier back to 1
+// while bumping `cycle`, so a player whose only high tiles were two Genèse
+// (tier 14) saw the Big Bang button vanish the moment they merged them - the
+// exact already-earned-eligibility revocation described above, reappearing
+// at the loop boundary.
 function hasUniverseTile(state) {
-  return state.grid.some(t => t && t.tier >= UNIVERSE_TIER);
+  return state.grid.some(t => t && tileProgressTier(t) >= UNIVERSE_TIER);
 }
 // "Surcharge du Big Bang" run upgrade (RUN_UPGRADE_TREE, config.js) applies
 // here rather than inside the pure bigBangGain() formula (config.js) so
