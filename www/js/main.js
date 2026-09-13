@@ -185,6 +185,18 @@ function requestStorageAccessBestEffort() {
   // backgrounding that didn't fully close the app. saveState() at the end
   // makes repeat calls safe (lastSaveTime is current by the time a second,
   // redundant event fires, so it computes ~0 elapsed and no-ops).
+  //
+  // Only a real absence counts as "offline". focus/pageshow also fire when
+  // nothing was ever paused - pageshow right after every load, focus after
+  // any desktop blur, or when a native rewarded ad hands focus back - and
+  // while the main loop runs it tick-saves every second, so lastSaveTime is
+  // at most ~1s old there. Treating that sliver as an absence popped an
+  // offline modal reading "Temps écoulé : 1s +N" for any player past ~2
+  // Stardust/s (Loris' "1sec - 1 stardust" report), and on desktop re-paid
+  // production the loop had already granted. Below this threshold the gap
+  // is simply left alone; a backgrounding that short loses a few seconds of
+  // half-rate production at most.
+  const OFFLINE_RESUME_MIN_MS = 10000;
   let resuming = false;
   function handleAppResume() {
     if (resuming) return; // re-entrancy guard - visibilitychange+focus can fire back to back
@@ -194,9 +206,11 @@ function requestStorageAccessBestEffort() {
     ensureDailyStats(Game.state);
     grantVipDailyGemsIfDue(Game.state);
     const info = computeOfflineGain(Game.state, Date.now());
-    const spawned = applyOfflineAutoSpawns(Game.state, info.cappedMs);
-    if (spawned > 0) renderAll();
-    if (info.gain >= 1) openOfflineModal(info, spawned);
+    if (info.elapsedMs >= OFFLINE_RESUME_MIN_MS) {
+      const spawned = applyOfflineAutoSpawns(Game.state, info.cappedMs);
+      if (spawned > 0) renderAll();
+      if (info.gain >= 1) openOfflineModal(info, spawned); // adds to a still-uncollected gain rather than replacing it - see openOfflineModal
+    }
     maybeOpenVipGemsModal();
     lastFrame = performance.now();
     saveState(Game.state); // refreshes lastSaveTime so a redundant resume event is a no-op
