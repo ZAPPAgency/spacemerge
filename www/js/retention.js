@@ -357,17 +357,25 @@ function ensureGemsAdStreak(state) {
     state.gemsAdStreak = { date: todayStr(), count: 0 };
   }
 }
-function pickWheelPrize() {
-  const total = WHEEL_PRIZES.reduce((s, p) => s + p.weight, 0);
+// "1 case débloquée" is left out of the draw once every cell is already
+// unlocked - applyDailyReward's unlockCell case has nothing to open then, so
+// late-run players landing on it (10% odds) got nothing at all, the exact
+// dead-end complaint that got "Fragment de skin" removed from this wheel.
+// Excluding it here rather than paying a fallback also keeps the animation
+// honest: spinVisual only ever lands on the prize actually awarded.
+function pickWheelPrize(state) {
+  const gridFull = unlockedCount(state) >= TOTAL;
+  const pool = WHEEL_PRIZES.filter(p => !(gridFull && p.type === "unlockCell"));
+  const total = pool.reduce((s, p) => s + p.weight, 0);
   let r = Math.random() * total;
-  for (const p of WHEEL_PRIZES) { if (r < p.weight) return p; r -= p.weight; }
-  return WHEEL_PRIZES[0];
+  for (const p of pool) { if (r < p.weight) return p; r -= p.weight; }
+  return pool[0];
 }
 function spinWheel(state, isBonus) {
   ensureDailySpin(state);
   if (isBonus && state.dailySpin.bonusUsed) return null;
   if (!isBonus && state.dailySpin.freeUsed) return null;
-  const prize = pickWheelPrize();
+  const prize = pickWheelPrize(state);
   if (prize.type === "stardust") grantStardust(state, prize.amount);
   else if (prize.type === "gems") grantGems(state, prize.amount);
   else if (prize.type === "unlockCell") applyDailyReward(state, { type: "unlockCell" });
