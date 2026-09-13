@@ -1,0 +1,387 @@
+:root{
+  --bg-deep:#05040d;
+  --bg-panel:#0d0a1f;
+  --bg-panel2:#161233;
+  --bg-card:#1a1640;
+  --accent:#8b5cf6;
+  --accent2:#22d3ee;
+  --stardust:#fbbf24;
+  --gems:#38bdf8;
+  --energy:#f472b6;
+  --text:#f1eefc;
+  --text-dim:#9089b8;
+  --locked:#1a1730;
+  --danger:#f87171;
+  --success:#34d399;
+  --radius:14px;
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;}
+html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  overflow:hidden;overscroll-behavior:none;touch-action:none;}
+
+#starsBg{position:fixed;inset:0;z-index:0;pointer-events:none;background:
+  radial-gradient(ellipse at 20% 10%, #1c1440 0%, transparent 55%),
+  radial-gradient(ellipse at 80% 85%, #10203f 0%, transparent 55%),
+  var(--bg-deep);}
+.star{position:absolute;background:#fff;border-radius:50%;opacity:.6;animation:twinkle 3s ease-in-out infinite;}
+@keyframes twinkle{0%,100%{opacity:.15}50%{opacity:.9}}
+
+.app{position:relative;z-index:1;height:100%;max-width:480px;margin:0 auto;
+  display:flex;flex-direction:column;
+  padding:calc(var(--safe-top) + 8px) 10px calc(var(--safe-bottom) + 8px);}
+
+.topbar{display:flex;gap:6px;justify-content:space-between;margin-bottom:8px;}
+.currency{flex:1;display:flex;align-items:center;gap:5px;background:var(--bg-panel);
+  border:1px solid #2a2450;border-radius:12px;padding:7px 8px;min-width:0;}
+.currency .icon{font-size:16px;flex-shrink:0;}
+.currency .value{font-weight:700;font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap;flex-shrink:0;}
+.currency.stardust .value{color:var(--stardust);}
+.currency.gems .value{color:var(--gems);}
+.currency.energy .value{color:var(--energy);}
+.currency.energy{flex:0 0 auto;}
+.currency.gems,.currency.energy,.currency.stardust{cursor:pointer;}
+/* The owned amount (.value) must never truncate - it's the number that
+   actually matters. If the pill runs out of room, the secondary "+X/s"
+   rate text is what shrinks/ellipsizes instead (previously the reverse:
+   .rate had flex-shrink:0 and .value didn't, so the owned amount itself
+   was the one getting cut off to "1.7…" under real device width. */
+.currency .rate{font-size:10px;color:var(--text-dim);margin-left:auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.iconBtn{appearance:none;border:1px solid #2a2450;background:var(--bg-panel);color:var(--text);
+  border-radius:10px;width:38px;height:38px;font-size:16px;flex-shrink:0;}
+.iconBtn:active{transform:scale(.92);}
+
+.toolbar{display:flex;align-items:center;gap:8px;margin-bottom:8px;min-height:40px;flex-wrap:wrap;}
+.btn{appearance:none;border:1px solid #322a5e;border-radius:12px;padding:10px 14px;font-size:14px;font-weight:700;
+  color:var(--text);background:linear-gradient(180deg,#2a2452,#201a42);display:flex;align-items:center;gap:6px;
+  box-shadow:0 2px 8px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.05);
+  transition:transform .1s ease, filter .15s ease, box-shadow .15s ease;}
+.btn:active{transform:scale(.95);}
+.btn.primary{background:linear-gradient(135deg,var(--accent),#5b21b6);border-color:#a78bfa77;box-shadow:0 4px 14px #8b5cf655, inset 0 1px 0 rgba(255,255,255,.15);}
+.btn.primary .cost{color:#fde68a;}
+.btn.invokeBtn{flex-direction:column;gap:2px;padding:9px 16px;}
+.invokeCosts{font-size:11px;font-weight:600;color:#fde68a;display:flex;align-items:center;gap:4px;}
+.invokeCostsSep{font-size:9px;color:#e0d5ff;font-weight:400;}
+.btn.bigbang{background:linear-gradient(135deg,#f59e0b,#dc2626);border-color:#fbbf2477;box-shadow:0 4px 16px #f59e0b66;animation:bigBangPulse 1.4s ease-in-out infinite;}
+.btn.ghost{background:transparent;border:1px solid #3a3070;box-shadow:none;}
+.btn.danger{background:linear-gradient(135deg,#f87171,#7f1d1d);border-color:#fca5a577;}
+.btn:disabled,.btn.disabled{opacity:.5;filter:grayscale(.6);box-shadow:none;animation:none;}
+.btn.full{width:100%;justify-content:center;}
+.hidden{display:none!important;}
+@keyframes bigBangPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+.hint{font-size:11px;color:var(--text-dim);flex:1;text-align:right;line-height:1.3;}
+
+.grid{flex:1;display:grid;grid-template-columns:repeat(6,1fr);gap:6px;align-content:center;min-height:0;}
+.cell{position:relative;aspect-ratio:1/1;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  background:#100c26;border:1px solid #2a244a;overflow:visible;}
+.cell.empty{background:#0c0920;border-style:dashed;}
+.cell.locked{background:var(--locked);border-style:solid;cursor:pointer;}
+.cell.locked .lockLabel{display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--text-dim);font-size:10px;}
+.cell.locked .lockLabel .emoji{font-size:16px;}
+.cell.selectableEmpty{outline:2px dashed var(--accent2);outline-offset:-2px;}
+.cell.selected{outline:2px solid var(--accent2);outline-offset:-2px;box-shadow:0 0 14px #22d3ee88;}
+
+.tile{position:absolute;inset:2px;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  box-shadow:inset 0 0 10px rgba(255,255,255,.15), 0 2px 6px rgba(0,0,0,.4);transition:transform .12s ease;touch-action:none;}
+.tile .emoji{font-size:22px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5));}
+.tile .tierNum{position:absolute;bottom:2px;right:4px;font-size:8px;font-weight:700;color:rgba(255,255,255,.65);}
+.tile.dragging{opacity:0;}
+.tile.merging{animation:mergePop .28s ease;}
+@keyframes mergePop{0%{transform:scale(1)}45%{transform:scale(1.35)}100%{transform:scale(1)}}
+.tile.spawnIn{animation:spawnIn .25s ease;}
+@keyframes spawnIn{0%{transform:scale(0)}100%{transform:scale(1)}}
+
+.ghostTile{position:fixed;z-index:50;pointer-events:none;width:56px;height:56px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(0,0,0,.5);
+  transform:translate(-50%,-50%) scale(1.1);}
+.ghostTile .emoji{font-size:26px;}
+
+.particle{position:absolute;width:6px;height:6px;border-radius:50%;background:#fff;pointer-events:none;
+  animation:particleFly .5s ease-out forwards;}
+@keyframes particleFly{0%{opacity:1;transform:translate(0,0) scale(1);}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(.3);}}
+
+.floatBonus{position:absolute;left:50%;top:40%;transform:translate(-50%,0);pointer-events:none;
+  font-size:12px;font-weight:800;color:var(--stardust);text-shadow:0 1px 3px rgba(0,0,0,.6);
+  animation:floatUp .75s ease-out forwards;white-space:nowrap;}
+@keyframes floatUp{0%{opacity:0;transform:translate(-50%,6px) scale(.8);}20%{opacity:1;transform:translate(-50%,0) scale(1.05);}
+  100%{opacity:0;transform:translate(-50%,-26px) scale(1);}}
+
+.quickActions{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;}
+.fab{flex:0 0 auto;appearance:none;display:flex;align-items:center;gap:7px;padding:8px 13px;border-radius:12px;
+  border:1px solid #3a3070;background:linear-gradient(180deg,#241f52,#1a1640);color:var(--text);
+  font-size:13px;font-weight:700;box-shadow:0 3px 10px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.05);
+  transition:transform .1s ease, box-shadow .15s ease, border-color .15s ease;}
+.fab:active{transform:scale(.95);}
+.fabIcon{font-size:17px;line-height:1;}
+.fabLabel{white-space:nowrap;}
+/* These two labels alternate between a fixed string ("Boost x2", "+8 Gems")
+   and a countdown ("5s" vs "12s" vs "1m 30s") - without a stable width, the
+   fab's own width changes every tick, which in a flex-wrap row can bump it
+   to a different line each time the digit count changes (the "ça bouge,
+   deuxième ligne, troisième ligne" bug). */
+#fabBoostLabel,#fabGemsAdLabel{display:inline-block;min-width:52px;text-align:center;font-variant-numeric:tabular-nums;}
+.fab.ready{border-color:var(--accent2);box-shadow:0 0 0 2px #22d3ee44, 0 3px 10px rgba(0,0,0,.35);animation:fabPulse 1.6s ease-in-out infinite;}
+@keyframes fabPulse{0%,100%{box-shadow:0 0 0 2px #22d3ee44, 0 3px 10px rgba(0,0,0,.35)}50%{box-shadow:0 0 0 4px #22d3ee66, 0 3px 10px rgba(0,0,0,.35)}}
+.fab.active{border-color:var(--stardust);background:linear-gradient(180deg,#3a2a0d,#241f52);}
+.fab.active .fabLabel{color:var(--stardust);font-variant-numeric:tabular-nums;}
+.fab:disabled{opacity:.4;}
+.fab.muted{opacity:.5;padding:8px 11px;background:linear-gradient(180deg,#1c1838,#151230);}
+.fab.muted:active{opacity:.85;}
+/* The two ad-for-currency fabs (boost, gems) are the ones we most want
+   watched, per explicit request to make them stand out from the rest of
+   the row rather than blend in as just another same-weight button. */
+.fab.featured{border-width:2px;padding:9px 15px;font-size:14px;
+  box-shadow:0 0 0 2px #22d3ee33, 0 4px 14px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.08);}
+
+/* 50px matches the standard AdMob/IAB mobile banner (320x50 pt) this placeholder stands in for. */
+.bannerAd{height:50px;background:#1a1533;border:1px dashed #3a3070;border-radius:8px;display:flex;
+  align-items:center;justify-content:center;font-size:11px;color:var(--text-dim);margin-top:6px;flex-shrink:0;}
+
+.toastContainer{position:fixed;left:0;right:0;bottom:calc(var(--safe-bottom) + 14px);display:flex;flex-direction:column;
+  align-items:center;gap:6px;z-index:80;pointer-events:none;}
+.toast{background:#1c1740ee;border:1px solid #3a3070;padding:8px 14px;border-radius:20px;font-size:13px;
+  box-shadow:0 4px 14px rgba(0,0,0,.4);animation:toastIn .18s ease, toastOut .3s ease 1.7s forwards;max-width:80vw;text-align:center;}
+@keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes toastOut{to{opacity:0;transform:translateY(-6px)}}
+
+/* Drawer */
+.drawerOverlay{position:fixed;inset:0;background:rgba(3,2,10,0);z-index:90;display:flex;justify-content:flex-end;
+  transition:background .28s ease;}
+.drawerOverlay.open{background:rgba(3,2,10,.65);}
+.drawer{width:min(84vw,300px);height:100%;background:linear-gradient(180deg,#161049,var(--bg-panel) 40%);
+  border-left:1px solid #2a2450;padding:calc(var(--safe-top) + 22px) 30px calc(var(--safe-bottom) + 22px);
+  display:flex;flex-direction:column;gap:11px;overflow-y:auto;box-sizing:border-box;
+  transform:translateX(100%);transition:transform .3s cubic-bezier(.16,.8,.3,1);box-shadow:-14px 0 34px rgba(0,0,0,.45);}
+.drawerOverlay.open .drawer{transform:translateX(0);}
+
+.drawerHead{appearance:none;width:100%;box-sizing:border-box;background:transparent;border:none;
+  display:flex;align-items:center;gap:14px;padding:14px 6px 20px;margin-bottom:8px;border-bottom:1px solid #2a2450;
+  text-align:left;color:var(--text);}
+.drawerHead:active{opacity:.8;}
+.drawerHeadInfo{flex:1;min-width:0;}
+.drawerHeadEditHint{font-size:12px;opacity:.55;}
+.drawerLogo{width:42px;height:42px;border-radius:12px;flex-shrink:0;
+  background:radial-gradient(circle at 35% 30%,#fffdf5,#f7b733 60%,#c9781a);
+  display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 12px rgba(247,183,51,.35);}
+.drawerTitle{font-size:17px;font-weight:800;letter-spacing:.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.drawerSubtitle{font-size:11px;color:var(--accent2);font-weight:600;}
+.drawerSubtitle:empty{display:none;}
+
+.drawerItem{appearance:none;width:100%;box-sizing:border-box;border:1px solid #2a2450;background:var(--bg-panel2);color:var(--text);
+  border-radius:12px;padding:13px 14px;font-size:14px;font-weight:600;text-align:left;display:flex;align-items:center;gap:12px;
+  transition:transform .1s ease, background .15s ease;flex-shrink:0;}
+.drawerItem:active{transform:scale(.97);background:#211b4d;}
+.drawerIcon{width:32px;height:32px;border-radius:10px;background:#251f57;display:flex;align-items:center;
+  justify-content:center;font-size:16px;flex-shrink:0;}
+.drawerItem.close{margin-top:14px;padding-top:16px;border:none;border-top:1px solid #2a2450;border-radius:0;background:transparent;color:var(--text-dim);}
+.drawerItem.close .drawerIcon{background:transparent;}
+
+.notifDot{width:9px;height:9px;border-radius:50%;background:var(--danger);margin-left:auto;flex-shrink:0;
+  box-shadow:0 0 0 2px #2a1030, 0 0 6px #f87171aa;}
+
+/* Full-screen panel */
+.panelOverlay{position:fixed;inset:0;background:var(--bg-deep);z-index:95;display:flex;justify-content:center;}
+.panel{width:100%;max-width:480px;height:100%;display:flex;flex-direction:column;box-sizing:border-box;
+  padding:calc(var(--safe-top) + 8px) 18px calc(var(--safe-bottom) + 8px);}
+.panelHeader{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.panelHeader h2{font-size:18px;margin:0;color:var(--accent2);}
+.panelBody > h3{font-size:14px;font-weight:800;color:var(--text);margin:8px 0 0;padding-left:10px;
+  border-left:3px solid var(--accent2);letter-spacing:.01em;text-transform:uppercase;}
+.panelBody{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:10px;padding-bottom:20px;}
+/* The default scrollbar rendered on top of card content looked out of place -
+   card boundaries already make scrollable areas clear without it. */
+.panelBody,.drawer,.modalCard,.tutCard,.godRitualList{scrollbar-width:none;-ms-overflow-style:none;}
+.panelBody::-webkit-scrollbar,.drawer::-webkit-scrollbar,.modalCard::-webkit-scrollbar,
+.tutCard::-webkit-scrollbar,.godRitualList::-webkit-scrollbar{display:none;}
+.panelBody > *{flex-shrink:0;} /* a flex child with overflow:hidden defaults its min-height to 0, letting the flexbox
+  algorithm crush it below content size when the list is long - this guards every panel section against that trap */
+
+.card{background:var(--bg-card);border:1px solid #2a2450;border-radius:14px;padding:15px;box-sizing:border-box;}
+.card.compact{padding:10px 12px;}
+.card.compact h3{font-size:13px;}
+.card.compact p.desc{font-size:11px;margin-bottom:6px;}
+.card h3{margin:0 0 4px;font-size:14px;}
+.vipCard{border-color:var(--stardust);box-shadow:0 0 0 1px var(--stardust) inset, 0 0 16px #f7b73333;}
+
+/* Two-per-row shop tiles (shop gem-services + the shared cosmetic grid) -
+   was one full-width card each, which the button dominated far more than
+   the swatch preview it went with. */
+.shopGrid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:stretch;}
+.shopGrid2 .card{padding:10px;display:flex;flex-direction:column;}
+.shopGrid2 .card h3{font-size:12px;margin-bottom:3px;}
+.shopGrid2 .card p.desc{font-size:10.5px;margin-bottom:0;line-height:1.3;flex:1;}
+.shopGrid2 .card .tag{font-size:9px;}
+.shopGrid2 .card .btn{padding:7px;font-size:11px;margin-top:8px;}
+
+.cosmeticGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.cosmeticTile{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px;
+  background:var(--bg-card);border:1px solid #2a2450;border-radius:14px;text-align:center;}
+.cosmeticTile.equipped{border-color:var(--accent2);box-shadow:0 0 0 1px var(--accent2) inset;}
+.skinSwatch{width:44px;height:44px;border-radius:12px;flex-shrink:0;border:1px solid #2a2450;
+  display:flex;align-items:center;justify-content:center;font-size:20px;}
+.skinSwatch.big{width:56px;height:56px;font-size:26px;}
+.cosmeticName{font-size:12px;font-weight:700;line-height:1.25;}
+.cosmeticTile .tag{margin:-2px 0 2px;}
+.cosmeticTile .btn{padding:7px 10px;font-size:11px;width:auto;min-width:70px;}
+
+.purchaseCheckAnim{font-size:48px;line-height:1;margin:6px auto 10px;animation:cosmicBoxReveal .4s ease-out;}
+.cosmicBoxCard{text-align:center;}
+.cosmicBoxAnim{font-size:52px;line-height:1;margin:10px auto 16px;width:88px;height:88px;
+  display:flex;align-items:center;justify-content:center;border-radius:20px;
+  background:radial-gradient(circle at 35% 30%, #2a2450, #14102a);border:2px solid #3a3070;}
+.cosmicBoxAnim.spinning{animation:cosmicBoxSpin .6s ease-in-out infinite;}
+@keyframes cosmicBoxSpin{0%,100%{transform:scale(1) rotate(0deg);}50%{transform:scale(1.12) rotate(8deg);}}
+.cosmicBoxAnim.revealed{border-color:var(--rarity-color, var(--accent2));
+  box-shadow:0 0 0 2px var(--rarity-color, var(--accent2)) inset, 0 0 20px var(--rarity-color, var(--accent2));
+  animation:cosmicBoxReveal .4s ease-out;}
+@keyframes cosmicBoxReveal{0%{transform:scale(.4);opacity:0;}70%{transform:scale(1.15);}100%{transform:scale(1);opacity:1;}}
+
+.skinManagerList{display:flex;flex-direction:column;gap:8px;margin-top:10px;max-height:60vh;overflow-y:auto;}
+.storyCard{position:relative;background:linear-gradient(160deg,#1a1640,#141130);border-color:#3a3070;}
+.storyCard h3{font-size:14px;color:#e8e4ff;}
+.storyCard.locked{opacity:.5;}
+.storyCard.locked h3{color:var(--text-dim);}
+.storyMark{position:absolute;top:10px;right:14px;font-size:34px;opacity:.12;pointer-events:none;}
+.card p.desc{margin:0 0 8px;font-size:12px;color:var(--text-dim);line-height:1.5;white-space:pre-line;}
+.card .rowBetween,.modalCard .rowBetween{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.tag{font-size:10px;padding:2px 7px;border-radius:8px;background:#2a2450;color:var(--text-dim);}
+.tag.owned{background:#134e2c;color:var(--success);}
+.tag.equipped{background:#3730a3;color:#c7d2fe;}
+
+.progressBar{height:8px;border-radius:5px;background:#241f47;overflow:hidden;margin:6px 0;}
+.progressBar .fill{height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent));}
+
+.skillRow .rowBetween{margin-top:6px;}
+.skillLevel{font-size:11px;color:var(--text-dim);}
+
+.tabs{display:flex;gap:6px;margin-bottom:6px;}
+.tabBtn{flex:1;padding:8px;border-radius:10px;background:var(--bg-panel2);border:1px solid #2a2450;
+  color:var(--text-dim);font-size:12px;font-weight:700;}
+.tabBtn.active{background:var(--accent);color:#fff;}
+
+.achCard.locked{opacity:.5;}
+.achBadge{font-size:20px;}
+
+.settingsRow{display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--bg-card);
+  border:1px solid #2a2450;border-radius:12px;}
+.switch{width:42px;height:24px;border-radius:14px;background:#2a2450;position:relative;flex-shrink:0;}
+.switch.on{background:var(--accent);}
+.switch .knob{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .15s ease;}
+.switch.on .knob{left:20px;}
+
+/* Modals (offline / daily login / wheel / big bang / tutorial) */
+.modalOverlay,.tutOverlay{position:fixed;inset:0;background:rgba(3,2,10,.82);z-index:100;display:flex;
+  align-items:center;justify-content:center;padding:16px calc(16px + var(--safe-bottom)) calc(16px + var(--safe-bottom));}
+.modalCard,.tutCard{background:var(--bg-panel);border:1px solid #3a3070;border-radius:16px;padding:18px;max-width:420px;width:100%;
+  box-shadow:0 10px 40px rgba(0,0,0,.5);max-height:80vh;overflow-y:auto;}
+.modalCard h3,.tutCard h3{margin:0 0 8px;font-size:17px;color:var(--accent2);}
+.modalCard p{margin:0 0 10px;font-size:13px;line-height:1.5;color:var(--text-dim);white-space:pre-line;}
+.modalCard .modalWarn{color:#fca5a5;font-size:11px;}
+.modalBtns{display:flex;gap:8px;margin-top:10px;}
+.modalBtns .btn{flex:1;justify-content:center;}
+.saveCodeText{width:100%;box-sizing:border-box;background:#0c0920;border:1px solid #2a2450;border-radius:10px;
+  color:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;padding:10px;
+  resize:vertical;line-height:1.4;word-break:break-all;}
+
+.profileNameInput{width:100%;box-sizing:border-box;background:#0c0920;border:1px solid #2a2450;border-radius:10px;
+  color:var(--text);font-size:15px;font-weight:700;padding:11px 12px;margin-bottom:12px;}
+.profileLabel{font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.03em;margin:0 0 8px;}
+.profilePicker{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;}
+.profileEmojiBtn{width:42px;height:42px;border-radius:10px;background:var(--bg-card);border:1px solid #2a2450;
+  font-size:19px;display:flex;align-items:center;justify-content:center;}
+.profileEmojiBtn.selected{border-color:var(--accent2);box-shadow:0 0 0 1px var(--accent2) inset;}
+.profileColorBtn{width:34px;height:34px;border-radius:50%;border:2px solid transparent;}
+.profileColorBtn.selected{border-color:#fff;box-shadow:0 0 0 2px var(--accent2);}
+.tutBtns{display:flex;justify-content:space-between;gap:8px;}
+.tutStep{font-size:11px;color:var(--text-dim);margin-bottom:4px;}
+
+.tutorial-highlight{outline:3px solid var(--accent2)!important;outline-offset:2px;box-shadow:0 0 22px #22d3eecc!important;
+  position:relative;z-index:101;animation:pulseHi 1s ease-in-out infinite;}
+@keyframes pulseHi{0%,100%{outline-color:#22d3ee}50%{outline-color:#8b5cf6}}
+
+.dailyGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px;}
+.dayCell{background:var(--bg-card);border:1px solid #2a2450;border-radius:10px;padding:8px 4px;text-align:center;font-size:10px;}
+.dayCell.claimed{background:#134e2c;border-color:var(--success);}
+.dayCell.today{outline:2px solid var(--accent2);}
+.dayCell .dNum{font-size:9px;color:var(--text-dim);}
+
+.wheelWrap{position:relative;width:180px;height:180px;margin:10px auto;}
+.wheel{width:100%;height:100%;border-radius:50%;border:4px solid var(--accent);
+  background:conic-gradient(from 0deg,#3730a3 0 51deg,#7c3aed 51deg 103deg,#2563eb 103deg 154deg,#0891b2 154deg 206deg,#be185d 206deg 257deg,#f59e0b 257deg 283deg,#dc2626 283deg 360deg);
+  transition:transform 3.5s cubic-bezier(.17,.67,.2,1);display:flex;align-items:center;justify-content:center;font-size:11px;}
+.wheelPointer{position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:20px;color:var(--accent2);}
+
+/* Ad / IAP simulation overlay */
+.simOverlay{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;}
+.simCard{background:#111;border:1px solid #333;border-radius:16px;padding:22px;max-width:340px;width:100%;text-align:center;}
+.simCard h3{margin:0 0 8px;color:#fff;}
+.simCard p{margin:0 0 14px;color:#aaa;font-size:13px;white-space:pre-line;}
+.simBar{height:6px;background:#222;border-radius:4px;overflow:hidden;margin-bottom:16px;}
+.simBarFill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent2),var(--accent));}
+
+.iapPrice{font-weight:700;color:var(--stardust);}
+
+
+.cell.skipArmed{outline:2px dashed var(--gems);outline-offset:-2px;}
+
+/* Gods of the Cosmos */
+/* Compact grid replacing one full card per god (renderGodsPanel) - tapping a
+   tile opens openGodDetailModal, which still uses godTop/godEmoji/godNames/
+   godTagsCol/godDesc below (those rules are no longer scoped under .godCard
+   since that wrapper doesn't exist in the DOM anymore). */
+.godsGrid{display:grid;grid-template-columns:repeat(4, 1fr);gap:8px;}
+.godTile{position:relative;aspect-ratio:.82;background:var(--bg-card);border:2px solid var(--rarity-color, #2a2450);
+  border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  appearance:none;color:var(--text);padding:6px;overflow:hidden;}
+.godTile:active{transform:scale(.95);}
+.godTile.locked{opacity:.5;border-color:#2a2450;}
+.godTile.equipped{box-shadow:0 0 0 1px var(--accent2) inset, 0 0 14px #22d3ee44;}
+.godTileEmoji{font-size:30px;line-height:1;}
+.godTileName{font-size:11px;font-weight:700;text-align:center;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
+.godTileTitle{font-size:9px;color:var(--text-dim);text-align:center;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
+.godTileBadge{position:absolute;top:4px;right:4px;font-size:11px;background:#0d2a30;color:var(--accent2);
+  width:16px;height:16px;border-radius:5px;display:flex;align-items:center;justify-content:center;}
+.godTileBadge.queued{background:#3a2a0d;color:var(--stardust);}
+
+.godTop{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+.godEmoji{width:42px;height:42px;border-radius:12px;background:#1a1640;display:flex;align-items:center;
+  justify-content:center;font-size:22px;flex-shrink:0;border:1px solid #2a2450;}
+.godNames{flex:1;min-width:0;}
+.godName{font-size:15px;font-weight:800;}
+.godTitle{font-size:11px;color:var(--text-dim);}
+.godTagsCol{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;}
+.rarityTag{font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:8px;}
+.alignTag{font-size:14px;}
+.godDesc{font-size:12px;color:#c9c3f0;margin:6px 0;line-height:1.4;}
+.godUnlockInfo{font-size:11px;color:var(--text-dim);margin-top:6px;}
+.equippedTag{font-size:9px;font-weight:800;color:var(--accent2);
+  background:#0d2a30;padding:2px 8px;border-radius:8px;text-transform:uppercase;white-space:nowrap;}
+.equippedTag.queued{color:var(--stardust);background:#3a2a0d;}
+.godPower{margin-top:10px;padding-top:10px;border-top:1px solid #2a2450;}
+.godPowerLabel{font-size:11px;color:var(--text-dim);}
+
+.godRitualList{display:flex;flex-direction:column;gap:10px;margin-top:12px;max-height:50vh;overflow-y:auto;}
+.godRitualCard{background:var(--bg-card);border:1px solid var(--accent2);border-radius:14px;padding:12px;
+  display:flex;align-items:center;gap:12px;text-align:left;appearance:none;color:var(--text);width:100%;}
+.godRitualCard:active{transform:scale(.98);}
+
+.progressCard .rowBetween,.modalCard .rowBetween{margin-bottom:4px;}
+.roadmap{position:relative;padding:4px;}
+/* line sits at the icon's horizontal center (padding + icon radius) so it visibly
+   runs behind each node's icon, not floating disconnected in empty space */
+.roadmap::before{content:"";position:absolute;left:23px;top:22px;bottom:22px;width:2px;z-index:0;
+  background:linear-gradient(180deg,var(--success),#3a3070 40%,#2a2450);}
+.roadNode{position:relative;display:flex;align-items:center;gap:16px;padding:11px 0;}
+.roadIcon{width:38px;height:38px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  font-size:17px;background:var(--bg-card);border:2px solid #3a3070;position:relative;z-index:1;}
+.roadNode.done .roadIcon{background:var(--success);border-color:var(--success);color:#04241a;font-weight:800;}
+.roadNode.next .roadIcon{border-color:var(--accent2);box-shadow:0 0 0 4px #22d3ee33;animation:pulseHi 1.6s ease-in-out infinite;}
+/* dim only the glyph, not .roadIcon itself - opacity on the icon would also
+   fade its solid background, letting the connecting line bleed through it */
+.roadNode.locked .roadIconGlyph{opacity:.45;filter:grayscale(1);}
+.roadLabel{font-size:13px;font-weight:700;}
+.roadNode.done .roadLabel{color:var(--text-dim);}
+.roadNode.locked .roadLabel{color:var(--text-dim);opacity:.7;}
+.roadSub{font-size:11px;color:var(--text-dim);margin-top:1px;}

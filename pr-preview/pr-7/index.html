@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <title>Godspark</title>
+    <meta
+      name="description"
+      content="Un Cosmos brisé, des Dieux endormis, et toi seul pour les réveiller. Fusionne des astéroïdes en mondes entiers, provoque ton Big Bang, et perce peu à peu le mystère de ce qui a vraiment causé la Rupture."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Godspark" />
+    <meta
+      property="og:description"
+      content="Réveille les Dieux endormis d'un Cosmos brisé. Fusionne, prospère, provoque ton Big Bang - et découvre la vérité sur la Rupture."
+    />
+    <meta property="og:image" content="social-share.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Godspark" />
+    <meta
+      name="twitter:description"
+      content="Fusionne. Réveille les Dieux. Perce le mystère de la Rupture."
+    />
+    <meta name="twitter:image" content="social-share.png" />
+    <!-- og:image/twitter:image must be an ABSOLUTE URL (https://votre-domaine/social-share.png)
+     once this is deployed to a real host - relative paths don't work for link-preview crawlers
+     (WhatsApp, iMessage, etc). The source image is generated in assets/social-share-source.html. -->
+    <!-- Custom logo (spark burst on a cosmic gradient, no emoji) - used both for
+     "Add to Home Screen" (apple-touch-icon, the icon iOS actually uses there,
+     NOT the <title> tag) and as the real app icon source for the eventual
+     Xcode/native build (icon-512.png, resize into the full AppIcon set). -->
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <meta name="apple-mobile-web-app-title" content="Godspark" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#0a0620" />
+    <link rel="stylesheet" href="css/style.css?v=20" />
+  </head>
+  <body>
+    <div id="starsBg"></div>
+
+    <div class="app">
+      <header class="topbar">
+        <div class="currency stardust" id="stardustPill">
+          <span class="icon">✨</span>
+          <span class="value" id="stardustValue">0</span>
+          <span class="rate" id="stardustRate">+0/s</span>
+        </div>
+        <div class="currency gems" id="gemsPill">
+          <span class="icon">💎</span>
+          <span class="value" id="gemsValue">0</span>
+        </div>
+        <button
+          class="iconBtn"
+          id="fabRestart"
+          aria-label="Recommencer la partie"
+        >
+          🔄
+        </button>
+        <div class="currency energy" id="energyPill">
+          <span class="icon">⚡</span>
+          <span class="value" id="energyValue">0</span>
+        </div>
+        <button class="iconBtn" id="menuBtn" aria-label="Menu">☰</button>
+      </header>
+
+      <div class="quickActions" id="fabStack">
+        <button class="fab hidden" id="fabCurrentGod">
+          <span class="fabIcon" id="fabGodEmoji">🔱</span
+          ><span class="fabLabel" id="fabGodName">-</span>
+        </button>
+        <button class="fab" id="fabShop">
+          <span class="fabIcon">🛒</span><span class="fabLabel">Boutique</span>
+        </button>
+        <button class="fab hidden" id="fabDailyLogin">
+          <span class="fabIcon">🎁</span><span class="fabLabel">Cadeau</span>
+        </button>
+        <button class="fab hidden" id="fabWheel">
+          <span class="fabIcon">🎡</span><span class="fabLabel">Roue</span>
+        </button>
+        <button class="fab" id="fabFreePlanet">
+          <span class="fabIcon">🌍</span
+          ><span class="fabLabel">Planète gratuite</span>
+        </button>
+        <button class="fab" id="fabUnlockCellAd">
+          <span class="fabIcon">🔓</span
+          ><span class="fabLabel">Case gratuite</span>
+        </button>
+        <button class="fab featured" id="fabBoost">
+          <span class="fabIcon">🚀</span
+          ><span class="fabLabel" id="fabBoostLabel">Boost x2</span>
+        </button>
+        <button class="fab featured" id="fabGemsAd">
+          <span class="fabIcon">💎</span
+          ><span class="fabLabel" id="fabGemsAdLabel">Pub</span>
+        </button>
+        <button class="fab muted" id="fabSkins" aria-label="Gérer les skins">
+          <span class="fabIcon">🎨</span>
+        </button>
+      </div>
+
+      <div class="toolbar">
+        <button class="btn primary invokeBtn" id="invokeBtn">
+          <span>Invoquer</span>
+          <span class="invokeCosts"
+            >✨<span id="invokeCost">15</span>
+            <span class="invokeCostsSep">ou</span> 💎<span id="invokeCostGems"
+              >5</span
+            ></span
+          >
+        </button>
+        <button class="btn bigbang hidden" id="bigBangBtn">💥 Big Bang</button>
+        <div class="hint" id="selectionHint"></div>
+      </div>
+
+      <div class="grid" id="grid"></div>
+
+      <div class="bannerAd hidden" id="bannerAd">
+        <span>Bannière publicitaire (placeholder)</span>
+      </div>
+    </div>
+
+    <div class="toastContainer" id="toastContainer"></div>
+
+    <!-- Slide-over drawer menu -->
+    <div class="drawerOverlay hidden" id="drawerOverlay">
+      <nav class="drawer" id="drawer">
+        <button class="drawerHead" id="drawerHeadEdit">
+          <div class="drawerLogo" id="drawerHeadLogo">✨</div>
+          <div class="drawerHeadInfo">
+            <div class="drawerTitle">
+              <span id="drawerHeadTitle">Joueur</span>
+              <span class="drawerHeadEditHint">✏️</span>
+            </div>
+            <div class="drawerSubtitle" id="drawerLevel">Niveau Cosmique 0</div>
+          </div>
+        </button>
+        <button class="drawerItem" data-panel="progression">
+          <span class="drawerIcon">🗺️</span><span>Progression</span>
+        </button>
+        <button class="drawerItem" data-panel="quests">
+          <span class="drawerIcon">📜</span><span>Quêtes</span
+          ><span class="notifDot hidden" id="questsNotifDot"></span>
+        </button>
+        <button class="drawerItem" data-panel="gods">
+          <span class="drawerIcon">🔱</span><span>Dieux du Cosmos</span>
+        </button>
+        <button class="drawerItem" data-panel="skills">
+          <span class="drawerIcon">⚡</span><span>Ascension</span>
+        </button>
+        <button class="drawerItem" data-panel="achievements">
+          <span class="drawerIcon">🏆</span><span>Succès</span>
+        </button>
+        <button class="drawerItem" data-panel="story">
+          <span class="drawerIcon">📖</span><span>Histoire</span>
+        </button>
+        <button class="drawerItem" data-panel="shop">
+          <span class="drawerIcon">🛒</span><span>Boutique</span>
+        </button>
+        <button class="drawerItem" data-panel="settings">
+          <span class="drawerIcon">⚙️</span><span>Réglages</span>
+        </button>
+        <button class="drawerItem close" id="drawerClose">
+          <span class="drawerIcon">✕</span><span>Fermer</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Generic full-screen panel (content injected per screen) -->
+    <div class="panelOverlay hidden" id="panelOverlay">
+      <div class="panel">
+        <div class="panelHeader">
+          <h2 id="panelTitle">Titre</h2>
+          <button class="iconBtn" id="panelClose">✕</button>
+        </div>
+        <div class="panelBody" id="panelBody"></div>
+      </div>
+    </div>
+
+    <!-- Tutorial -->
+    <div class="tutOverlay hidden" id="tutOverlay">
+      <div class="tutCard">
+        <div class="tutStep" id="tutStep">Étape 1 / 3</div>
+        <h3 id="tutTitle">Bienvenue !</h3>
+        <p id="tutText">...</p>
+        <div class="tutBtns">
+          <button class="btn" id="tutSkip">Passer</button>
+          <button class="btn primary" id="tutNext">Suivant</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Offline gains modal -->
+    <div class="modalOverlay hidden" id="offlineModal">
+      <div class="modalCard">
+        <h3>Pendant votre absence…</h3>
+        <p id="offlineText">+0 Stardust</p>
+        <div class="modalBtns">
+          <button class="btn" id="offlineCollect">Récupérer</button>
+          <button class="btn primary" id="offlineDouble">Doubler (pub)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Daily login modal -->
+    <div class="modalOverlay hidden" id="dailyModal">
+      <div class="modalCard">
+        <h3>Connexion quotidienne</h3>
+        <p id="dailyStreakLine" class="desc"></p>
+        <div class="dailyGrid" id="dailyGrid"></div>
+        <div class="modalBtns">
+          <button class="btn primary" id="dailyClaim">Récupérer</button>
+        </div>
+        <button class="btn ghost full" id="dailyClose" style="margin-top: 8px">
+          Fermer
+        </button>
+      </div>
+    </div>
+
+    <!-- Daily wheel modal -->
+    <div class="modalOverlay hidden" id="wheelModal">
+      <div class="modalCard">
+        <h3>Roue quotidienne</h3>
+        <div class="wheelWrap">
+          <div class="wheel" id="wheelEl"></div>
+          <div class="wheelPointer">▼</div>
+        </div>
+        <p id="wheelResult"></p>
+        <div class="modalBtns">
+          <button class="btn primary" id="wheelSpinFree">Spin gratuit</button>
+          <button class="btn" id="wheelSpinAd">Spin bonus (pub)</button>
+        </div>
+        <button class="btn ghost" id="wheelClose">Fermer</button>
+      </div>
+    </div>
+
+    <!-- Big Bang confirmation modal -->
+    <div class="modalOverlay hidden" id="bigBangModal">
+      <div class="modalCard">
+        <h3>💥 Déclencher le Big Bang ?</h3>
+        <p id="bigBangText"></p>
+        <p class="modalWarn">
+          La grille et le Stardust actuels seront réinitialisés. L'Énergie
+          Cosmique, les Gems, l'Ascension et vos succès sont conservés pour
+          toujours.
+        </p>
+        <div class="modalBtns">
+          <button class="btn" id="bigBangCancel">Annuler</button>
+          <button class="btn primary" id="bigBangConfirm">Confirmer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Big Bang summary: shown right after confirming, recaps the finished run and points at what's next -->
+    <div class="modalOverlay hidden" id="bigBangSummaryModal">
+      <div class="modalCard">
+        <h3>💥 Cycle terminé !</h3>
+        <p class="rowBetween">
+          <span>Stardust généré</span><strong id="bbSummaryStardust">0</strong>
+        </p>
+        <p class="rowBetween">
+          <span>Palier le plus élevé</span><strong id="bbSummaryTier">-</strong>
+        </p>
+        <p class="rowBetween">
+          <span>Énergie Cosmique gagnée</span
+          ><strong id="bbSummaryEnergy">+0 ⚡</strong>
+        </p>
+        <p class="desc" id="bbSummaryHint" style="margin-top: 10px"></p>
+        <button
+          class="btn primary full"
+          id="bbSummaryClose"
+          style="margin-top: 12px"
+        >
+          Continuer l'aventure
+        </button>
+      </div>
+    </div>
+
+    <!-- Voluntary restart (no Universe tile required, unlike Big Bang) -->
+    <div class="modalOverlay hidden" id="restartModal">
+      <div class="modalCard">
+        <h3>🔄 Recommencer la partie ?</h3>
+        <p>
+          Tu vas perdre la progression de cette partie : la grille et le
+          Stardust actuels repartiront de zéro.
+        </p>
+        <p class="modalWarn">
+          L'Énergie Cosmique, les Gems, l'Ascension, les Dieux et vos succès
+          sont conservés pour toujours.
+        </p>
+        <div class="modalBtns">
+          <button class="btn" id="restartCancel">Annuler</button>
+          <button class="btn danger" id="restartConfirm">Recommencer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stardust info popup: tapping the Stardust pill -->
+    <div class="modalOverlay hidden" id="stardustInfoModal">
+      <div class="modalCard">
+        <h3>✨ Ta grille</h3>
+        <p class="rowBetween">
+          <span>Grille démarrée depuis</span
+          ><strong id="stardustInfoRunTime">-</strong>
+        </p>
+        <p class="rowBetween">
+          <span>Généré aujourd'hui</span
+          ><strong id="stardustInfoToday">-</strong>
+        </p>
+        <p class="rowBetween">
+          <span>🏆 Votre meilleur temps (Big Bang)</span
+          ><strong id="stardustInfoBest">-</strong>
+        </p>
+        <button
+          class="btn full"
+          id="stardustInfoClose"
+          style="margin-top: 10px"
+        >
+          Fermer
+        </button>
+      </div>
+    </div>
+
+    <!-- Invoke choice: tapping the main Invoquer button offers Stardust or Gems -->
+    <div class="modalOverlay hidden" id="invokeChoiceModal">
+      <div class="modalCard">
+        <h3>Invoquer un Météorite</h3>
+        <div class="modalBtns" style="flex-direction: column">
+          <button class="btn primary full" id="invokeChoiceStardust">
+            ✨ <span id="invokeChoiceStardustCost">15</span> Stardust
+          </button>
+          <button
+            class="btn full"
+            id="invokeChoiceGems"
+            style="margin-top: 8px"
+          >
+            💎 3 Gems
+          </button>
+        </div>
+        <button
+          class="btn ghost full"
+          id="invokeChoiceClose"
+          style="margin-top: 8px"
+        >
+          Annuler
+        </button>
+      </div>
+    </div>
+
+    <!-- Purchase confirmation: replaces a plain toast for every IAP, so the effect (VIP especially) is unmistakable -->
+    <div class="modalOverlay hidden" id="purchaseConfirmModal">
+      <div class="modalCard" style="text-align: center">
+        <div class="purchaseCheckAnim">✅</div>
+        <h3 id="purchaseConfirmTitle">Achat confirmé !</h3>
+        <p class="desc" id="purchaseConfirmText"></p>
+        <button
+          class="btn primary full"
+          id="purchaseConfirmClose"
+          style="margin-top: 8px"
+        >
+          Continuer
+        </button>
+      </div>
+    </div>
+
+    <!-- Cosmic Box reveal: a spin-then-reveal animation instead of just a toast -->
+    <div class="modalOverlay hidden" id="cosmicBoxModal">
+      <div class="modalCard cosmicBoxCard">
+        <div class="cosmicBoxAnim" id="cosmicBoxAnim">📦</div>
+        <h3 id="cosmicBoxTitle">Ouverture...</h3>
+        <p class="desc" id="cosmicBoxText"></p>
+        <button class="btn primary full hidden" id="cosmicBoxClose">
+          Continuer
+        </button>
+      </div>
+    </div>
+
+    <!-- Skin manager: compact popup reachable from the home screen, closable by tapping outside -->
+    <div class="modalOverlay hidden" id="skinManagerModal">
+      <div class="modalCard">
+        <div class="rowBetween">
+          <h3>🎨 Skins</h3>
+          <button class="iconBtn" id="skinManagerClose">✕</button>
+        </div>
+        <div id="skinManagerList" class="skinManagerList"></div>
+      </div>
+    </div>
+
+    <!-- Gems quick menu: tapping the Gems pill offers the two things Gems are for -->
+    <div class="modalOverlay hidden" id="gemsMenuModal">
+      <div class="modalCard">
+        <h3>💎 Gems</h3>
+        <p class="desc">Que veux-tu faire avec tes Gems ?</p>
+        <div class="modalBtns" style="flex-direction: column">
+          <button class="btn primary full" id="gemsMenuShop">
+            🛒 Dépenser en boutique
+          </button>
+          <button class="btn full" id="gemsMenuGods" style="margin-top: 8px">
+            🔱 Améliorer un Dieu
+          </button>
+        </div>
+        <button
+          class="btn ghost full"
+          id="gemsMenuClose"
+          style="margin-top: 8px"
+        >
+          Fermer
+        </button>
+      </div>
+    </div>
+
+    <!-- Remove-ads soft prompt: shown once, the first time the player watches a 5th rewarded ad -->
+    <div class="modalOverlay hidden" id="removeAdsPromptModal">
+      <div class="modalCard">
+        <h3>🚫 Marre des pubs ?</h3>
+        <p>
+          Tu as pas mal regardé de publicités ces derniers temps. Avec «
+          Suppression des pubs », tous ces bonus (boost, planète gratuite, quête
+          bonus...) deviennent instantanés, pour toujours.
+        </p>
+        <div class="modalBtns">
+          <button class="btn" id="removeAdsPromptLater">Plus tard</button>
+          <button class="btn primary" id="removeAdsPromptBuy">
+            Suppression des pubs
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- God ritual: first choice is mandatory, later ones are managed from the Gods panel -->
+    <div class="modalOverlay hidden" id="godRitualModal">
+      <div class="modalCard">
+        <h3>🔱 Le rituel des lunes</h3>
+        <p>
+          Quatre lunes se sont unies sous ta main. Un Dieu du Cosmos répond
+          enfin à l'appel — choisis celui qui t'accompagnera pour cette partie.
+        </p>
+        <div class="godRitualList" id="godRitualList"></div>
+      </div>
+    </div>
+
+    <!-- God detail (lore/story) -->
+    <div class="modalOverlay hidden" id="godDetailModal">
+      <div class="modalCard" id="godDetailCard"></div>
+    </div>
+
+    <!-- Manual save backup (export/import) - see state.js exportSaveCode/importSaveCode -->
+    <div class="modalOverlay hidden" id="saveCodeModal">
+      <div class="modalCard">
+        <h3 id="saveCodeTitle">Sauvegarde manuelle</h3>
+        <p id="saveCodeHelp"></p>
+        <textarea
+          id="saveCodeText"
+          class="saveCodeText"
+          rows="6"
+          spellcheck="false"
+        ></textarea>
+        <div class="modalBtns">
+          <button class="btn" id="saveCodeCancel">Fermer</button>
+          <button class="btn primary" id="saveCodeAction">Copier</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile editor (drawer header identity) -->
+    <div class="modalOverlay hidden" id="profileModal">
+      <div class="modalCard">
+        <h3>Mon profil</h3>
+        <input
+          type="text"
+          id="profileNameInput"
+          class="profileNameInput"
+          maxlength="16"
+          placeholder="Ton nom"
+        />
+        <p class="profileLabel">Icône</p>
+        <div class="profilePicker" id="profileEmojiPicker"></div>
+        <p class="profileLabel">Couleur</p>
+        <div class="profilePicker" id="profileColorPicker"></div>
+        <div class="modalBtns">
+          <button class="btn" id="profileCancel">Annuler</button>
+          <button class="btn primary" id="profileSave">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="js/config.js?v=20"></script>
+    <script src="js/state.js?v=20"></script>
+    <script src="js/audio.js?v=20"></script>
+    <script src="js/services.js?v=20"></script>
+    <script src="js/economy.js?v=20"></script>
+    <script src="js/gods.js?v=20"></script>
+    <script src="js/retention.js?v=20"></script>
+    <script src="js/ui.js?v=20"></script>
+    <script src="js/input.js?v=20"></script>
+    <script src="js/main.js?v=20"></script>
+    <script type="module" src="js/native-bridge.js"></script>
+  </body>
+</html>
