@@ -161,8 +161,11 @@
         <div class="swapSection">
           <div class="invokeSectionLabel">Échanger</div>
           <div class="invokeSectionRow">
+            <!-- Contenu remplacé à chaque frame par updateHeader() (ui.js) :
+                 coût en Gems, ou l'offre "pub = échange gratuit" quand le
+                 joueur n'a pas assez de Gems. -->
             <button class="btn swapCellsBtn" id="fabSwapCells" aria-label="Échanger deux cases">
-              <img class="inlineCurrencyIcon" src="assets/ui/gems_ad.png" alt="Gems" /><span id="swapCellsCost">50</span>
+              <img class="inlineCurrencyIcon" src="assets/ui/gems_ad.png" alt="Gems" />50
             </button>
             <!-- Loris: "le bouton de gestion des skins devrait se trouver a
              droite du bouton échanger" - moved out of the fab stack, same
