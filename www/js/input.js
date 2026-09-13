@@ -978,10 +978,12 @@ async function onBuyIAP(productId) {
       // (activateAutoClicker, economy.js) grants an equivalent 1h here,
       // auto-targeting the player's own highest-tier occupied cell since
       // this grant is programmatic, not player-picked like every other
-      // activation of this feature.
+      // activation of this feature. keepFreeDaily: this is bought content on
+      // top of the daily allowance, not a spend of it - without it, buying
+      // the pack before using today's free clicker silently burned it.
       { let bestIdx = null, bestTier = 0;
         for (let i = 0; i < TOTAL; i++) { const t = state.grid[i]; if (t && t.tier > bestTier) { bestTier = t.tier; bestIdx = i; } }
-        if (bestIdx !== null) { activateAutoClicker(state, bestIdx); state.autoClicker.activeUntil = Date.now() + 3600000; } }
+        if (bestIdx !== null) activateAutoClicker(state, bestIdx, { durationMs: 3600000, keepFreeDaily: true }); }
       break;
     case "gems_small": case "gems_medium": case "gems_large": case "gems_mega":
       state.gems += product.amount; state.lifetime.gemsEarned += product.amount; break;

@@ -251,10 +251,20 @@ function equipCosmetic(state, id) {
 // call site) means both the free and the ad-gated reactivation path can
 // call this one function - by the time either reaches here, today's free
 // use is spent either way.
-function activateAutoClicker(state, targetIdx) {
+//
+// `opts.keepFreeDaily` opts out of that, for the one caller where the
+// assumption doesn't hold: the paid starter pack (onBuyIAP, input.js), which
+// grants a clicker window as part of the purchase. Consuming the day's free
+// activation there meant a player who bought the pack before using it lost
+// it outright - once the paid hour expired they were told to watch an ad for
+// a free daily use they had never had.
+// `opts.durationMs` likewise lets that purchase grant its own longer window
+// instead of overwriting activeUntil right after this call.
+function activateAutoClicker(state, targetIdx, opts) {
+  const durationMs = (opts && opts.durationMs) || AUTO_CLICKER_DURATION_MS;
   state.autoClicker.targetIdx = targetIdx;
-  state.autoClicker.activeUntil = Date.now() + AUTO_CLICKER_DURATION_MS;
-  state.autoClicker.freeUsedDate = todayStr();
+  state.autoClicker.activeUntil = Date.now() + durationMs;
+  if (!(opts && opts.keepFreeDaily)) state.autoClicker.freeUsedDate = todayStr();
 }
 function isAutoClickerFreeAvailable(state) {
   return state.autoClicker.freeUsedDate !== todayStr();
