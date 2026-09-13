@@ -103,6 +103,16 @@ function requestStorageAccessBestEffort() {
 
   const gainInfo = computeOfflineGain(state, Date.now());
   const spawnedAtBoot = applyOfflineAutoSpawns(state, gainInfo.cappedMs);
+  // Claim the offline window immediately by refreshing lastSaveTime, BEFORE
+  // any resume event can run. `pageshow` always fires right after load and is
+  // wired to handleAppResume() below - without this, that guaranteed first
+  // resume recomputed the exact same elapsed span (nothing had saved yet: the
+  // tick-save needs ~1s, the autosave 5s) and applied it a second time.
+  // applyOfflineAutoSpawns() is not idempotent, so that meant double
+  // meteorites and double "autoSpawns" quest progress on every cold start
+  // after an absence. The `resuming` flag below can't catch it - it guards
+  // simultaneous events, not a sequential boot-then-pageshow pair.
+  saveState(state);
 
   renderAll();
 
