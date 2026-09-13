@@ -1132,13 +1132,32 @@ function wireClickSound() {
 }
 
 // Tapping the dark backdrop closes whichever modal is open, same as its own
-// close/cancel button - except the first-god ritual, which is a mandatory
-// one-time choice with no close button at all by design.
+// close/cancel button. "Same as" has to mean running that button's handler,
+// not just hiding the overlay - a bare hide skipped real work:
+//   - godUnlockModal: closeGodUnlockModal drains the reveal queue, so a
+//     double unlock left the 2nd god stuck until some unrelated later merge.
+//   - confirmActionModal / fusionPromoModal / eggFinaleModal: their close
+//     handlers clear pending state (the queued action, the promo's product,
+//     the finale's still-running burst/sparkle nodes).
+// Modals without an entry here have nothing beyond the hide to do.
+// Never dismissable from the backdrop:
+//   - godRitualModal: a mandatory one-time choice with no close button.
+//   - offlineModal: only its two buttons pay the pending gain out, so a
+//     backdrop tap silently threw away the player's offline earnings.
+const MODAL_BACKDROP_LOCKED = new Set(["godRitualModal", "offlineModal"]);
 function wireModalBackdropClose() {
+  const closeHandlers = {
+    godUnlockModal: closeGodUnlockModal,
+    confirmActionModal: closeConfirmModal,
+    fusionPromoModal: closeFusionPromoModal,
+    eggFinaleModal: closeEggFinaleModal,
+  };
   document.addEventListener("click", (e) => {
-    if (e.target.classList.contains("modalOverlay") && e.target.id !== "godRitualModal") {
-      e.target.classList.add("hidden");
-    }
+    const overlay = e.target;
+    if (!overlay.classList.contains("modalOverlay") || MODAL_BACKDROP_LOCKED.has(overlay.id)) return;
+    const close = closeHandlers[overlay.id];
+    if (close) close();
+    else overlay.classList.add("hidden");
   });
 }
 
