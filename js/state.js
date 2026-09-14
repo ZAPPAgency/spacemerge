@@ -73,12 +73,23 @@ function defaultState() {
     dailyStats: { date: null, stardustAtDayStart: 0 }, // see ensureDailyStats() - powers the Stardust info popup's "today" figure
 
     skills: { prod: 0, swarm: 0, gravity: 0, echo: 0, luck: 0 },
-    ownedSkins: ["default", "classic"], // "default" ambiance + "classic" emoji set - the two free starting cosmetics
-    equippedAmbiance: "default",
+    // Run upgrades (RUN_UPGRADE_TREE): bought with Stardust, reset at every Big Bang.
+    runUpgrades: { catalyst: 0, resonance: 0, surge: 0, cadence: 0 },
+    ownedSkins: ["classic"], // free starting set
     equippedEmojiSet: "classic",
+    // Artwork or emoji for the equipped set. Tiers without artwork fall back to emoji.
+    iconStyle: "illustrated", // "illustrated" | "emoji"
+
+    // One-time promo popups (checkFusionPromo, retention.js): each fires at most once.
+    promptsShown: { starterPack: false, vipPass: false, removeAdsPrompt: false },
+    // "Don't ask again" checkboxes of confirm modals, keyed by dontAskKey.
+    dontAskAgain: {},
+    // Secret easter egg ids (EASTER_EGGS). The counter stays hidden until the first one.
+    easterEggs: { unlockedIds: [] },
+    // Minimum real time between two promo popups (PROMO_MIN_GAP_MS, retention.js).
+    lastPromoShownAt: 0,
 
     dailyLogin: { lastClaimDay: null, streak: 0, cycleDay: 1, streakFreezeCharges: 0 },
-    skinFragments: 0,
 
     quests: { date: null, active: [], bonusAd: { done: false, claimed: false } },
     questsCompletedTotal: 0,
@@ -88,7 +99,6 @@ function defaultState() {
     gods: {
       unlockedIds: [],
       currentGodId: null,
-      nextGodId: null,
       erebusStreak: 0,             // fusions since the last manual tap bonus (Erebus challenge)
       usedShortcutThisRun: false, // Morgorath challenge requires never using a gem-shop grid shortcut (Sauter une case / Échanger deux cases)
       morgorathChallengeCleared: false,
@@ -97,10 +107,20 @@ function defaultState() {
     },
     moonMergesThisRun: 0, // toward MOON_MERGES_TO_CHOOSE_GOD (first-god ritual)
 
-    cooldowns: { freePlanetUntil: 0, prodBoostUntil: 0, prodBoostActiveUntil: 0, unlockCellAdUntil: 0, gemsAdUntil: 0 },
+    cooldowns: { unlockCellAdUntil: 0, swapAdUntil: 0, gemsAdUntil: 0 },
     dailySpin: { date: null, freeUsed: false, bonusUsed: false },
+    // Free daily Gems claim (grantGemsFree, economy.js). `date` uses todayStr().
+    gemsAdFree: { date: null, used: false },
+    // Ad-for-Gems watches today. After GEMS_AD_STREAK_SIZE, cooldowns.gemsAdUntil
+    // imposes a pause. Resets daily (ensureGemsAdStreak, retention.js).
+    gemsAdStreak: { date: null, count: 0 },
+    // targetIdx: cell auto-tapped; kept when the cell empties so it resumes on refill.
+    // activeUntil <= now means inactive. freeUsedDate: one free use per day.
+    // tutorialShown: the intro modal plays only once, ever.
+    autoClicker: { targetIdx: null, activeUntil: 0, freeUsedDate: null, tutorialShown: false },
 
-    iap: { removeAds: false, vipUntil: 0, ownedSkinPacks: [], stardustBoost: false, vipLastGemsDay: null },
+    // starterPack: one-time purchase, so the shop and promo don't offer it again.
+    iap: { removeAds: false, vipUntil: 0, ownedSkinPacks: [], stardustBoost: false, starterPack: false, vipLastGemsDay: null },
 
     settings: { sound: true, music: true, notifications: true },
     firstPlayedDay: todayStr(),
@@ -135,11 +155,24 @@ function loadState() {
     if (data.version !== SAVE_VERSION) return defaultState();
     // fill any missing fields added by later updates (defensive against partial saves)
     const fresh = defaultState();
-    return deepFill(data, fresh);
+    return migrateRetiredFields(deepFill(data, fresh));
   } catch (e) {
     console.warn("Save corrompue, nouvelle partie.", e);
     return defaultState();
   }
+}
+
+// deepFill() only adds fields. This converts fields no longer read into their
+// current equivalent. Must run on every load path, including native-bridge.js.
+function migrateRetiredFields(state) {
+  // gods.nextGodId: retired queue for a god applied at the next Big Bang.
+  // Apply the queued god now instead of losing it.
+  const gods = state.gods;
+  if (gods && gods.nextGodId !== undefined) {
+    if (gods.nextGodId && gods.unlockedIds.includes(gods.nextGodId)) gods.currentGodId = gods.nextGodId;
+    delete gods.nextGodId;
+  }
+  return state;
 }
 
 function deepFill(data, fresh) {
@@ -162,11 +195,8 @@ function saveState(state) {
 }
 
 // Manual backup, independent of localStorage: lets the player copy their
-// progress as a short text code and paste it back in later. This exists
-// because this page runs inside a sandboxed cross-origin iframe (the Claude
-// Artifact viewer) that does not grant the permission needed for the
-// Storage Access API to work, so automatic persistence can fail after a
-// full browser restart with no client-side fix available - see main.js.
+// progress as a text code and paste it back later (move devices, recover after
+// clearing site data). See docs/SAVE_BACKUP.md.
 function exportSaveCode(state) {
   return btoa(unescape(encodeURIComponent(JSON.stringify(state))));
 }
@@ -185,27 +215,44 @@ function importSaveCode(code) {
 function productionMultiplier(state) {
   const skillMult = 1 + state.skills.prod * 0.03;
   const vipMult = isVipActive(state) ? 2 : 1;
-  const boostMult = (state.cooldowns.prodBoostActiveUntil > Date.now()) ? 2 : 1;
   const godMult = getGodEffects(state).prodMult || 1;
   const iapBoostMult = state.iap.stardustBoost ? 1.5 : 1;
-  return skillMult * vipMult * boostMult * godMult * iapBoostMult;
+  // Only factor here that resets at every Big Bang.
+  const runUpgradeMult = 1 + (state.runUpgrades.catalyst || 0) * 0.04;
+  return skillMult * vipMult * godMult * iapBoostMult * runUpgradeMult;
 }
 function tierGodMultiplier(state, tier) {
   const bonus = getGodEffects(state).tierProdBonus;
   return (bonus && tier >= bonus.minTier && tier <= bonus.maxTier) ? bonus.mult : 1;
 }
-function effectiveTileProd(state, tier) { return tierProd(tier) * tierGodMultiplier(state, tier) * productionMultiplier(state); }
+// Production keeps doubling past Genèse: a cycle-1 tier-1 tile counts as tier 15 (tileProgressTier),
+// so merging two Genèse never lowers income. God tier bonuses only cover base tiers.
+function tileBaseProd(state, tile) {
+  const progress = tileProgressTier(tile);
+  return tierProd(progress) * tierGodMultiplier(state, progress);
+}
+function effectiveTileProd(state, tile) { return tileBaseProd(state, tile) * productionMultiplier(state); }
 function totalProduction(state) {
   let p = 0;
   for (let i = 0; i < TOTAL; i++) {
     const t = state.grid[i];
-    if (t) p += tierProd(t.tier) * tierGodMultiplier(state, t.tier);
+    if (t) p += tileBaseProd(state, t);
   }
   return p * productionMultiplier(state);
 }
 
 function isVipActive(state) { return state.iap.vipUntil > Date.now(); }
 function adsRemoved(state) { return state.iap.removeAds || isVipActive(state); }
+// Owned one-time purchases are hidden from the shop and promos.
+// Consumables and the subscription always return false.
+function isOneTimeIapOwned(state, productId) {
+  switch (productId) {
+    case "remove_ads": return state.iap.removeAds;
+    case "stardust_boost": return state.iap.stardustBoost;
+    case "starter_pack": return state.iap.starterPack;
+    default: return false;
+  }
+}
 // VIP's "débloque tous les skins" perk is a subscription benefit, not a
 // permanent grant - it must stop working the moment vipUntil lapses, so it's
 // checked here rather than pushed into ownedSkins (which never expires).
@@ -228,7 +275,9 @@ function offlineCapHours(state) {
 function autoSpawnIntervalMs(state) {
   const reduction = Math.min(state.skills.gravity * 0.05, 0.4);
   const godMult = getGodEffects(state).spawnSpeedMult || 1;
-  return Math.max(MIN_AUTO_SPAWN_MS, BASE_AUTO_SPAWN_MS * (1 - reduction) * godMult);
+  // Separate from `reduction`'s cap. MIN_AUTO_SPAWN_MS stays the floor.
+  const runUpgradeMult = Math.max(0.4, 1 - (state.runUpgrades.cadence || 0) * 0.04);
+  return Math.max(MIN_AUTO_SPAWN_MS, BASE_AUTO_SPAWN_MS * (1 - reduction) * godMult * runUpgradeMult);
 }
 
 function emptyUnlockedIndices(state) {

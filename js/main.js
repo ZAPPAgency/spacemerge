@@ -1,25 +1,8 @@
 // Godspark - boot sequence & main loop
 "use strict";
 
-// This page is normally embedded cross-origin (the Claude Artifact iframe,
-// e.g. b7a8...frame.claudeusercontent.com inside claude.ai). On iOS Safari,
-// a cross-origin iframe only gets persistent localStorage after an explicit
-// grant via the Storage Access API - and that grant does not reliably
-// survive a full browser/app restart, which is the save-loss bug this is
-// working around.
-//
-// A previous version of this function blocked boot behind a mandatory tap
-// that called document.requestStorageAccess(). That call requires the
-// embedding iframe's `sandbox` attribute to include
-// `allow-storage-access-by-user-activation` - and Claude's artifact iframe
-// (sandbox="allow-scripts allow-same-origin allow-forms") does not have
-// that flag, so the call always silently fails there. The tap gate was
-// therefore pure friction with zero effect, so it's gone. We still fire the
-// request in the background (harmless, and it *would* help on any host that
-// does grant the flag), but nothing blocks on it, and it is NOT the actual
-// fix for save loss - see docs/SAVE_BACKUP.md and the in-app "Sauvegarde
-// manuelle" export/import in the Réglages panel for the real mitigation
-// available while running inside this specific iframe sandbox.
+// Asks for storage access when the game runs inside a cross-origin iframe, where
+// iOS Safari may not persist localStorage. No-op on GitHub Pages and native builds.
 function requestStorageAccessBestEffort() {
   const embedded = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
   if (!embedded || !document.hasStorageAccess || !document.requestStorageAccess) return;
@@ -49,8 +32,23 @@ function requestStorageAccessBestEffort() {
     skipCellArmed: false,
     swapArmed: false,
     swapFirstIdx: null,
+    // The armed swap was paid with an ad: handleSwapTap skips the Gems cost once.
+    swapFree: false,
+    // Waiting for the player to pick the auto-clicker's target cell.
+    autoClickerArmed: false,
+    // Ad already watched but no cell picked yet: reopening the picker is free.
+    autoClickerPaid: false,
+    // God ids waiting for their unlock modal (maybeOpenGodRevealModal, ui.js).
+    pendingGodReveals: [],
+    // Merges chained within MERGE_STREAK_WINDOW_MS; raises the combo chime.
+    mergeStreak: 0,
+    lastMergeAt: 0,
+    // Recent merge timestamps for the "La Cascade" easter egg (EASTER_EGG_CHAIN_*).
+    mergeChainTimes: [],
     pendingOfflineGain: null,
     bigBangPromptShown: hasUniverseTile(state), // don't re-prompt on reload if a Universe tile already existed last save
+    // Fabs that played their reveal animation. Not saved, so it replays once per launch.
+    fabRevealed: new Set(),
   });
 
   buildStars();
@@ -66,6 +64,9 @@ function requestStorageAccessBestEffort() {
 
   const gainInfo = computeOfflineGain(state, Date.now());
   const spawnedAtBoot = applyOfflineAutoSpawns(state, gainInfo.cappedMs);
+  // Save now to refresh lastSaveTime: `pageshow` fires right after load and would
+  // otherwise apply the same offline spawns a second time.
+  saveState(state);
 
   renderAll();
 
@@ -74,7 +75,12 @@ function requestStorageAccessBestEffort() {
     showTutStep(0);
   } else if (gainInfo.gain >= 1) {
     openOfflineModal(gainInfo, spawnedAtBoot);
+  } else {
+    // checkGodMilestones() above may have queued a reveal (e.g. imported save).
+    maybeOpenGodRevealModal();
   }
+  // Outside the branches: only a returning VIP can have pending Gems.
+  maybeOpenVipGemsModal();
 
   let lastFrame = performance.now();
   function frame(now) {
@@ -99,6 +105,7 @@ function requestStorageAccessBestEffort() {
     if (Math.abs(Game.state.stardust - Game.displayedStardust) < 0.05) Game.displayedStardust = Game.state.stardust;
 
     tickAutoSpawn(now);
+    tickAutoClicker();
 
     updateHeader();
     updateFabs();
@@ -117,21 +124,41 @@ function requestStorageAccessBestEffort() {
   // tick, which as a side effect silently discarded any longer time spent
   // away instead of crediting it. This computes the catch-up on resume too,
   // and resets lastFrame so the next tick doesn't also try to claim that gap.
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") {
-      saveState(Game.state);
-      MusicService.stop(); // stop scheduling further chords/sparkles
-      muteAllAudio(); // clean fade of EVERYTHING currently sounding (SFX included) instead of the OS abruptly cutting it mid-envelope (the "bizarre"/dull click on close)
-      return;
-    }
+  //
+  // Also wired to focus/pageshow: WKWebView doesn't always fire visibilitychange.
+  // The final saveState() makes a duplicate event compute ~0 elapsed.
+  //
+  // focus/pageshow also fire without a real absence (after load, after an ad).
+  // Gaps under OFFLINE_RESUME_MIN_MS are ignored so the loop's production isn't paid twice.
+  const OFFLINE_RESUME_MIN_MS = 10000;
+  let resuming = false;
+  function handleAppResume() {
+    if (resuming) return; // visibilitychange and focus can fire back to back
+    resuming = true;
     unmuteAllAudio();
     if (Game.settings.music) MusicService.start();
     ensureDailyStats(Game.state);
     grantVipDailyGemsIfDue(Game.state);
     const info = computeOfflineGain(Game.state, Date.now());
-    const spawned = applyOfflineAutoSpawns(Game.state, info.cappedMs);
-    if (spawned > 0) renderAll();
-    if (info.gain >= 1) openOfflineModal(info, spawned);
+    if (info.elapsedMs >= OFFLINE_RESUME_MIN_MS) {
+      const spawned = applyOfflineAutoSpawns(Game.state, info.cappedMs);
+      if (spawned > 0) renderAll();
+      if (info.gain >= 1) openOfflineModal(info, spawned); // adds to an uncollected gain
+    }
+    maybeOpenVipGemsModal();
     lastFrame = performance.now();
+    saveState(Game.state);
+    resuming = false;
+  }
+  function handleAppHide() {
+    saveState(Game.state);
+    MusicService.stop();
+    muteAllAudio(); // fade out all sounds, otherwise the OS cut makes an audible click
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") handleAppHide();
+    else handleAppResume();
   });
+  window.addEventListener("focus", handleAppResume);
+  window.addEventListener("pageshow", handleAppResume);
 })();

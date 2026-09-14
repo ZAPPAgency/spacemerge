@@ -65,20 +65,36 @@ function describeGodEffect(god, level) {
 }
 function isGodUnlocked(state, godId) { return state.gods.unlockedIds.includes(godId); }
 
-function unlockGod(state, godId) {
+// Queues an unlock modal (maybeOpenGodRevealModal, ui.js) shown at the next safe moment.
+// `opts.silent` skips it when the caller already has its own reveal (ritual picker, Cosmic Box).
+function unlockGod(state, godId, opts) {
   if (isGodUnlocked(state, godId)) return;
   state.gods.unlockedIds.push(godId);
+  if (opts && opts.silent) return;
   Sfx.chest();
-  toast(`Nouveau Dieu débloqué : ${getGod(godId).name} ${getGod(godId).emoji}`);
+  Game.pendingGodReveals.push(godId);
+}
+
+// Returns null if already unlocked or unknown. The last egg also unlocks the secret god
+// Ananké, pushed directly to avoid unlockGod()'s modal (openEggGrandRevealModal has its own).
+function unlockEasterEgg(state, id) {
+  if (state.easterEggs.unlockedIds.includes(id)) return null;
+  const egg = EASTER_EGGS.find(e => e.id === id);
+  if (!egg) return null;
+  state.easterEggs.unlockedIds.push(id);
+  const complete = state.easterEggs.unlockedIds.length >= EASTER_EGGS.length;
+  if (complete && !isGodUnlocked(state, "ananke")) state.gods.unlockedIds.push("ananke");
+  return { egg, complete };
 }
 
 // Milestone-type gods unlock themselves the moment their `check` passes -
 // same pattern as achievements. Called after every stat-changing event.
+// Also unlocks shop gods whose free `altCheck` condition passes.
 function checkGodMilestones(state) {
   GODS.forEach(g => {
-    if (g.unlock.type === "milestone" && !isGodUnlocked(state, g.id) && g.unlock.check(state)) {
-      unlockGod(state, g.id);
-    }
+    if (isGodUnlocked(state, g.id)) return;
+    if (g.unlock.type === "milestone" && g.unlock.check(state)) unlockGod(state, g.id);
+    else if (g.unlock.type === "shop" && g.unlock.altCheck && g.unlock.altCheck(state)) unlockGod(state, g.id);
   });
 }
 
@@ -86,9 +102,11 @@ function checkGodMilestones(state) {
 function onFusionForGods(state, newTier) {
   if (newTier === 2) {
     state.moonMergesThisRun += 1;
+    // Both ritual gods unlock together so the picker offers a real choice.
     if (state.moonMergesThisRun === MOON_MERGES_TO_CHOOSE_GOD && !state.gods.currentGodId) {
-      unlockGod(state, "selena");
-      Game.pendingGodRitual = true; // main loop opens the picker modal next render
+      unlockGod(state, "selena", { silent: true });
+      unlockGod(state, "zephar", { silent: true });
+      Game.pendingGodRitual = true; // the picker modal is their reveal
     }
   }
 
@@ -99,9 +117,9 @@ function onFusionForGods(state, newTier) {
     if (state.gods.erebusStreak >= erebus.unlock.target) unlockGod(state, "erebus");
   }
 
-  // Morgorath challenge: reach the Universe tier without ever using a
-  // grid-shortcut shop item (Sauter une case / Échanger deux cases) this run.
-  if (newTier === TIERS.length && !state.gods.usedShortcutThisRun) {
+  // Morgorath challenge: reach UNIVERSE_TIER (not the top tier) without using a
+  // grid-shortcut shop item this run.
+  if (newTier === UNIVERSE_TIER && !state.gods.usedShortcutThisRun) {
     state.gods.morgorathChallengeCleared = true;
   }
 
@@ -116,27 +134,16 @@ function checkThanatosChallenge(state) {
 }
 
 // ---- Choosing / swapping gods ----
-// The very first pick applies immediately (there is no "current run" to
-// protect yet). Any later pick only takes effect on the *next* Big Bang,
-// per the "changer de dieu qu'entre les parties" rule.
+// Picking a god applies immediately, even mid-run.
 function chooseGod(state, godId) {
   if (!isGodUnlocked(state, godId)) return false;
-  if (!state.gods.currentGodId) {
-    state.gods.currentGodId = godId;
-    state.gods.nextGodId = null;
-  } else {
-    state.gods.nextGodId = (godId === state.gods.currentGodId) ? null : godId;
-  }
+  state.gods.currentGodId = godId;
   return true;
 }
 function applyPendingGodAtBigBang(state) {
   if (state.gods.currentGodId) {
     const id = state.gods.currentGodId;
     state.gods.usageCount[id] = (state.gods.usageCount[id] || 0) + 1;
-  }
-  if (state.gods.nextGodId) {
-    state.gods.currentGodId = state.gods.nextGodId;
-    state.gods.nextGodId = null;
   }
   state.moonMergesThisRun = 0;
   state.gods.erebusStreak = 0;
@@ -182,28 +189,38 @@ function nextGodMilestoneHint(state) {
   };
   const best = candidates.slice().sort((a, b) => progressOf(b) - progressOf(a))[0];
   const pct = Math.min(99, Math.round(progressOf(best) * 100));
-  return `Prochain Dieu en approche : ${best.emoji} ${best.name} (${pct}% - ${best.unlock.label})`;
+  // Locked gods show their portrait as a teaser, not the emoji.
+  return `Prochain Dieu en approche : ${godPortraitHtml(best, "inlineTierIcon")} ${best.name} (${pct}% - ${best.unlock.label})`;
 }
 
-// Cosmic Box: rolls any god weighted by rarity, regardless of that god's
-// normal unlock path (including the "box"-only gods, whose only path IS
-// this roll). A duplicate roll pays out Gems instead (scaled to the rarity
-// rolled) so the box never feels wasted.
+// Cosmic Box: rolls a god weighted by rarity, whatever its normal unlock path.
+// Only unowned gods can drop: the rarity is re-rolled until it has one, which keeps
+// BOX_RARITY_WEIGHTS proportional. Once every god is owned, the box grants Gems.
 function rollCosmicBox(state) {
+  // Secret gods never drop and don't block the switch to Gems.
+  const unownedGods = GODS.filter(g => !g.secret && !isGodUnlocked(state, g.id));
+  if (unownedGods.length === 0) {
+    return { duplicate: false, allGodsOwned: true, gems: rollCosmicBoxGems(state) };
+  }
   const total = Object.values(BOX_RARITY_WEIGHTS).reduce((a, b) => a + b, 0);
-  let r = Math.random() * total;
-  let pickedRarity = "commun";
-  for (const rarity of Object.keys(BOX_RARITY_WEIGHTS)) {
-    const weight = BOX_RARITY_WEIGHTS[rarity];
-    if (r < weight) { pickedRarity = rarity; break; }
-    r -= weight;
+  let pool = [];
+  while (pool.length === 0) {
+    let r = Math.random() * total;
+    let pickedRarity = "commun";
+    for (const rarity of Object.keys(BOX_RARITY_WEIGHTS)) {
+      const weight = BOX_RARITY_WEIGHTS[rarity];
+      if (r < weight) { pickedRarity = rarity; break; }
+      r -= weight;
+    }
+    pool = unownedGods.filter(g => g.rarity === pickedRarity);
   }
-  const pool = GODS.filter(g => g.rarity === pickedRarity);
   const god = pool[Math.floor(Math.random() * pool.length)];
-  if (isGodUnlocked(state, god.id)) {
-    const gems = grantGems(state, BOX_DUPLICATE_GEMS[pickedRarity]);
-    return { duplicate: true, god, gems };
-  }
-  unlockGod(state, god.id);
+  unlockGod(state, god.id, { silent: true }); // openCosmicBoxRevealModal (ui.js) is the reveal
   return { duplicate: false, god };
+}
+
+// Squaring Math.random() skews toward small amounts: P(<=100) ~71%, P(>180) ~5%.
+function rollCosmicBoxGems(state) {
+  const amount = Math.max(10, Math.round(Math.pow(Math.random(), 2) * 200));
+  return grantGems(state, amount);
 }
