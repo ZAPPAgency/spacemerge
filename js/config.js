@@ -1,4 +1,4 @@
-// Godspark - configuration & pure formulas (no state, no DOM)
+// Spacemerge - configuration & pure formulas (no state, no DOM)
 "use strict";
 
 const COLS = 6, ROWS = 5, TOTAL = COLS * ROWS;
@@ -446,7 +446,7 @@ const IAP_CATALOG = [
   // `perks`: one line per benefit, rendered as a list in the shop hero card.
   // The Gems value badge is computed at render time (passGemsValueBadgeText, ui.js).
   { id: "vip_monthly", type: "subscription", name: "Pass Supernova", price: "5,99 $/mois",
-    desc: "L'expérience Godspark, sans limites.",
+    desc: "L'expérience Spacemerge, sans limites.",
     perks: [
       "Aucune publicité tant que le Pass est actif",
       "Production de Stardust doublée",

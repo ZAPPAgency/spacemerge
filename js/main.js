@@ -1,4 +1,4 @@
-// Godspark - boot sequence & main loop
+// Spacemerge - boot sequence & main loop
 "use strict";
 
 // Asks for storage access when the game runs inside a cross-origin iframe, where

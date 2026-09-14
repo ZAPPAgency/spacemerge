@@ -1,4 +1,4 @@
-// Godspark - synthesized audio (Web Audio API only, zero external files)
+// Spacemerge - synthesized audio (Web Audio API only, zero external files)
 "use strict";
 
 let audioCtx = null;

@@ -1,4 +1,4 @@
-// Godspark - Ad & IAP abstraction layer.
+// Spacemerge - Ad & IAP abstraction layer.
 //
 // Game code only ever calls AdService.* and IAPService.*. On web this file
 // simulates both with visible modals so the whole monetization loop is

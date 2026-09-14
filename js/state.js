@@ -1,4 +1,4 @@
-// Godspark - game state: defaults, load/save, migrations, daily helpers
+// Spacemerge - game state: defaults, load/save, migrations, daily helpers
 "use strict";
 
 function todayStr(d) {
