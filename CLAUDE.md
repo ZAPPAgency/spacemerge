@@ -27,8 +27,8 @@ forrestchang/andrej-karpathy-skills and drona23/claude-token-efficient.
 - Locate before reading: `grep -n "function name"` then Read with `offset`/`limit`.
   `ui.js` (~2200 lines) and `input.js` (~1300) must never be read in full.
 - Don't re-read a file you just read or edited.
-- Never open unless explicitly asked: `game-full.html`, `cosmerge-v2.html` (200 KB, stale
-  single-file builds), `www/assets/**`, `assets/**`, images, `package-lock.json`, `dist-www/`, `ios/`, `android/`.
+- Never open unless explicitly asked: `game-full.html` (200 KB, stale
+  single-file build), `www/assets/**`, `assets/**`, images, `package-lock.json`, `dist-www/`, `ios/`, `android/`.
 - `docs/*.md` are App Store submission docs: read only the one relevant to the task.
 - Answers: concise, no preamble, no restating the request, no pasting back code you just wrote.
   Thorough in reasoning, brief in output.
@@ -36,7 +36,7 @@ forrestchang/andrej-karpathy-skills and drona23/claude-token-efficient.
 
 ## 3. Project
 
-Godspark: merge / idle / prestige space game. Vanilla HTML/CSS/JS in `www/`, shipped as a
+Spacemerge: merge / idle / prestige space game. Vanilla HTML/CSS/JS in `www/`, shipped as a
 native app via Capacitor 8 (iOS set up; Android planned, `@capacitor/android` not installed yet).
 UI text is French (`lang="fr"`), English localization is planned.
 

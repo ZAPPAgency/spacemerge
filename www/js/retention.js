@@ -1,4 +1,4 @@
-// Godspark - retention systems: offline gains, daily login, quests, achievements, wheel
+// Spacemerge - retention systems: offline gains, daily login, quests, achievements, wheel
 "use strict";
 
 // ---- Central stardust income point (keeps run/lifetime/quest stats in sync) ----

@@ -27,7 +27,7 @@ Avec ces réponses, l'app devrait obtenir la classification **4+**.
 ## Note sur les "loot boxes"
 Apple exige la divulgation des probabilités pour tout mécanisme de type
 loot box reachable avec de l'argent réel, même indirectement via une
-monnaie virtuelle achetable. C'est le cas de la Boîte Cosmique de Godspark
+monnaie virtuelle achetable. C'est le cas de la Boîte Cosmique de Spacemerge
 (coûte des Gems, et des Gems sont vendues en IAP) : coche donc **"Oui"** à
 la question Loot Boxes, et assure-toi que la description App Store
 mentionne aussi les probabilités (voir `APP_STORE_METADATA.md`) en plus de
