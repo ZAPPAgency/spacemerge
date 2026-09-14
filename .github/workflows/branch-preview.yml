@@ -10,14 +10,15 @@ on:
     branches-ignore: [main, gh-pages]
   delete:
 
-# Groupe partagé avec deploy.yml et preview.yml : tous ces workflows poussent
-# sur gh-pages, il faut les sérialiser sinon les push se marchent dessus.
+# One group per branch. Never share it with other workflows: a group keeps only
+# one pending run, so a shared group cancels the other workflows.
 concurrency:
-  group: gh-pages-deploy
-  cancel-in-progress: false
+  group: branch-preview-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
+  pull-requests: read
 
 jobs:
   deploy:
@@ -26,8 +27,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Slug de la branche
-        id: slug
+      - name: Préparer le slug, ignorer si une PR est ouverte
+        id: prep
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           slug=$(echo "$GITHUB_REF_NAME" \
             | tr '[:upper:]' '[:lower:]' \
@@ -36,32 +39,60 @@ jobs:
             echo "Nom de branche sans caractere utilisable : $GITHUB_REF_NAME" >&2
             exit 1
           fi
-          echo "value=$slug" >> "$GITHUB_OUTPUT"
+          echo "slug=$slug" >> "$GITHUB_OUTPUT"
+
+          prs=$(gh pr list --head "$GITHUB_REF_NAME" --state open --json number --jq 'length')
+          if [ "$prs" != "0" ]; then
+            echo "PR ouverte sur $GITHUB_REF_NAME : preview geree par preview.yml."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: JamesIves/github-pages-deploy-action@v4
+        if: steps.prep.outputs.skip == 'false'
         with:
           folder: www
           branch: gh-pages
-          target-folder: branch-preview/${{ steps.slug.outputs.value }}
+          target-folder: branch-preview/${{ steps.prep.outputs.slug }}
           commit-message: "preview: ${{ github.ref_name }} (${{ github.sha }})"
 
       - name: Lien de la preview
+        if: steps.prep.outputs.skip == 'false'
         run: |
-          url="https://zappagency.github.io/cosmerge/branch-preview/${{ steps.slug.outputs.value }}/"
-          echo "### Preview de \`$GITHUB_REF_NAME\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "$url" >> "$GITHUB_STEP_SUMMARY"
+          url="https://zappagency.github.io/cosmerge/branch-preview/${{ steps.prep.outputs.slug }}/"
+          {
+            echo "### Preview de \`$GITHUB_REF_NAME\`"
+            echo ""
+            echo "$url"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   cleanup:
-    if: github.event_name == 'delete' && github.event.ref_type == 'branch'
+    # Deleting gh-pages itself also fires `delete`: nothing to clean up then.
+    if: >-
+      github.event_name == 'delete' &&
+      github.event.ref_type == 'branch' &&
+      github.event.ref != 'gh-pages'
     runs-on: ubuntu-latest
     steps:
+      - name: La branche gh-pages existe-t-elle ?
+        id: check
+        run: |
+          if git ls-remote --exit-code --heads \
+              "https://github.com/${GITHUB_REPOSITORY}.git" gh-pages >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "gh-pages absente, rien a nettoyer."
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@v4
+        if: steps.check.outputs.exists == 'true'
         with:
           ref: gh-pages
-          fetch-depth: 0
 
       - name: Supprimer la preview de la branche effacée
+        if: steps.check.outputs.exists == 'true'
         env:
           DELETED_BRANCH: ${{ github.event.ref }}
         run: |
@@ -75,7 +106,7 @@ jobs:
           fi
           dir="branch-preview/$slug"
           if [ ! -d "$dir" ]; then
-            echo "Pas de preview pour $DELETED_BRANCH, rien à faire."
+            echo "Pas de preview pour $DELETED_BRANCH, rien a faire."
             exit 0
           fi
           git config user.name "github-actions[bot]"

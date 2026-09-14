@@ -9,10 +9,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Groupe partagé avec preview.yml et branch-preview.yml : ces workflows
-# poussent tous sur gh-pages, il faut les sérialiser.
+# Not shared with the preview workflows: a group keeps only one pending run, so a
+# shared group cancels runs. gh-pages push conflicts are retried by the action.
 concurrency:
-  group: gh-pages-deploy
+  group: gh-pages-main
   cancel-in-progress: false
 
 permissions:

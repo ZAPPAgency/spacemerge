@@ -5,14 +5,18 @@ on:
   pull_request:
     types: [opened, reopened, synchronize, closed]
 
-# Groupe partagé avec deploy.yml et branch-preview.yml (push sur gh-pages).
+# One group per PR: a new push replaces the running preview of the same PR only.
+# Never share it with other workflows: a group keeps only one pending run.
 concurrency:
-  group: gh-pages-deploy
-  cancel-in-progress: false
+  group: pr-preview-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
   pull-requests: write
+  # Needed by wait-for-pages-deployment (reads the Pages builds API). A `permissions`
+  # block sets unlisted scopes to none: without it the action times out.
+  pages: read
 
 jobs:
   deploy-preview:

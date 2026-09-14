@@ -95,15 +95,60 @@ function sweep(freqFrom, freqTo, dur, type, vol) {
   osc.start(); osc.stop(ctx.currentTime + dur);
 }
 
+// Filtered white noise: textured sounds (impacts, crackle) that oscillators can't make.
+function noiseBurst(dur, filterType, freqFrom, freqTo, vol) {
+  if (!Game.settings.sound) return;
+  const ctx = ensureAudio();
+  if (!ctx) return;
+  const bufferSize = Math.max(1, Math.floor(ctx.sampleRate * dur));
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+  const noise = ctx.createBufferSource();
+  noise.buffer = buffer;
+  const filter = ctx.createBiquadFilter();
+  filter.type = filterType || "lowpass";
+  filter.frequency.setValueAtTime(freqFrom, ctx.currentTime);
+  filter.frequency.exponentialRampToValueAtTime(Math.max(freqTo, 20), ctx.currentTime + dur);
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(vol, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
+  noise.connect(filter); filter.connect(gain); gain.connect(masterOutGain);
+  noise.start(); noise.stop(ctx.currentTime + dur);
+}
+
+// Combo chime notes (Hz), one step per merge streak. Major scale so long combos stay pleasant.
+const COMBO_NOTES = [523.25, 587.33, 659.25, 739.99, 830.61, 932.33, 1046.5, 1174.66];
+
 const Sfx = {
   click() { beep(920, 0.05, "sine", 0.035); },
   // A quick rising whoosh (two tiles converging) followed by a bright two-note
   // chime (the pop of becoming one) - deliberately distinct from tap/click,
   // and scales up a little with tier so late-game fusions feel more powerful.
+  // Unused: merges play meteorImpact. Kept for an alternate merge style.
   merge(newTier) {
     const base = 220 + newTier * 18;
     sweep(base * 0.55, base * 1.7, 0.15, "sine", 0.085);
     setTimeout(() => chime([base * 1.7, base * 2.5], 55, "triangle", 0.08), 140);
+  },
+  // Merge sound, paired with playMeteorMerge() in ui.js: whoosh, then pop + crackle,
+  // then a combo note. Short because it can fire several times per second.
+  // The 110 ms delay must match METEOR_FALL_MS in ui.js.
+  // `streak` (see MERGE_STREAK_WINDOW_MS in input.js) raises the combo note.
+  meteorImpact(newTier, streak) {
+    // Loudness follows tier, like the visual effect; streak only adds a small accent.
+    const t = Math.min(newTier, 10);
+    const s = Math.min(streak || 0, 6);
+    const boost = 1 + (t - 1) * 0.19 + s * 0.05; // ~1x at tier 1, ~2.75x at tier 10 + streak 6
+    noiseBurst(0.05, "bandpass", 2800, 1000, Math.min(0.045 * boost, 0.11));
+    setTimeout(() => {
+      const swing = 1 + (t - 1) * 0.07 + s * 0.03;
+      sweep(520 + t * 9, (200 + t * 6) / swing, 0.09, "triangle", Math.min(0.12 * boost, 0.28));
+      noiseBurst(0.07, "lowpass", 1800, 280, Math.min(0.07 * boost, 0.17));
+      noiseBurst(0.05, "highpass", 2200 * swing, 3200 * swing, Math.min(0.02 * boost, 0.05));
+      const note = COMBO_NOTES[Math.min(streak || 0, COMBO_NOTES.length - 1)];
+      setTimeout(() => chime([note, note * 1.19], 45, "triangle", Math.min(0.065 * boost, 0.15)), 40);
+    }, 110);
   },
   tap() { beep(700, 0.08, "square", 0.04); },
   spawn() { beep(500, 0.12, "sine", 0.05); },
@@ -112,6 +157,13 @@ const Sfx = {
   purchase() { chime([520, 780, 1040], 70, "sine", 0.06); },
   bigBang() { chime([80, 160, 320, 640, 960], 90, "sawtooth", 0.09); },
   chest() { chime([440, 660, 880], 90, "triangle", 0.07); },
+  // Wheel peg tick, called by scheduleWheelTicks (input.js). Pitch jitter avoids a machine-gun effect.
+  wheelTick() { beep(880 + Math.random() * 220, 0.035, "square", 0.045); },
+  // Distinct from chest() so a wheel win is clearly noticed.
+  wheelWin() {
+    chime([523.25, 659.25, 783.99, 1046.5], 65, "triangle", 0.075);
+    setTimeout(() => chime([1318.5, 1568], 45, "sine", 0.05), 260);
+  },
   quest() { chime([660, 880], 90, "sine", 0.06); },
 };
 

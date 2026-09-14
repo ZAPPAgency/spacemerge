@@ -1,5 +1,17 @@
 # Pourquoi une sauvegarde manuelle, et ce qu'elle contourne
 
+> **Contexte (à jour) :** le problème décrit ci-dessous appartient à une
+> période antérieure du projet, quand le jeu était prototypé comme Artifact
+> Claude. Ce n'est plus le cas : `www/` est maintenant hébergé en page de
+> premier niveau sur GitHub Pages (voir `README.md`) et la future app
+> Capacitor utilisera `@capacitor/preferences` - les deux solutions listées
+> dans « Ce qui fonctionne réellement » ci-dessous sont donc déjà (ou
+> bientôt) la réalité, pas de simples options théoriques. La sauvegarde
+> manuelle (export/import) reste dans le jeu, mais maintenant surtout comme
+> fonctionnalité utile en soi (transfert entre appareils, récupération après
+> effacement des données du site) plutôt que comme contournement actif d'un
+> bug encore présent.
+
 ## Le problème
 
 Le jeu, tel qu'accédé via un lien d'Artifact Claude, tourne dans une iframe

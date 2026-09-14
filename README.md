@@ -9,9 +9,9 @@ il n'y en a pas d'autre.
 
 Le contenu de `www/` est déployé automatiquement sur **GitHub Pages** à
 chaque `git push` sur `main`, via GitHub Actions
-(`.github/workflows/deploy-pages.yml`) :
+(`.github/workflows/deploy.yml`) :
 
-**https://zappagency.github.io/godspark/**
+**https://zappagency.github.io/cosmerge/**
 
 Aucune étape manuelle : éditer les fichiers dans `www/`, commit, push
 sur `main`, et la nouvelle version est en ligne en 1-2 minutes (suivre
@@ -22,6 +22,15 @@ git add -A
 git commit -m "..."
 git push
 ```
+
+**Sur une branche/PR (pas `main`)** : deux autres workflows publient une
+preview séparée, sans jamais toucher à l'URL ci-dessus :
+- `.github/workflows/preview.yml` ("Deploy PR previews") - une PR ouverte
+  obtient `https://zappagency.github.io/cosmerge/pr-preview/pr-<N>/`,
+  mise à jour à chaque push sur la branche de la PR.
+- `.github/workflows/branch-preview.yml` ("Deploy branch previews") - toute
+  autre branche poussée (sans PR ouverte dessus) obtient
+  `https://zappagency.github.io/cosmerge/branch-preview/<nom-de-branche>/`.
 
 Une workflow GitHub Actions est nécessaire (plutôt que le déploiement
 "classique" par branche) car `www/` est un sous-dossier — le build
@@ -48,6 +57,11 @@ build Capacitor/iOS fonctionne (voir `vite.config.js`, `root: "www"`).
   (CSS/JS inlinés), utilisées pour tester le jeu ailleurs que via un
   serveur local. Régénérées par un script Python ponctuel (voir
   historique des commits), pas de dépendance à `www/` en direct.
+  **⚠️ Datent du tout premier commit du projet et n'ont jamais été
+  régénérées depuis** - elles ne reflètent aucun des ajouts/corrections
+  de cette branche. Les previews de PR (voir ci-dessus) sont maintenant
+  le moyen à jour de tester le jeu ailleurs qu'en local ; à supprimer ou
+  régénérer selon ce dont vous avez encore besoin.
 
 ## Pour builder pour iOS
 

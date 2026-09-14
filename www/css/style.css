@@ -18,6 +18,9 @@
   --safe-bottom:env(safe-area-inset-bottom,0px);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;}
+/* Blocks the iOS long-press "save image" menu and image dragging.
+   pointer-events:none is safe: no <img> is a tap target, taps go to the parent button/cell. */
+img{-webkit-touch-callout:none;-webkit-user-drag:none;pointer-events:none;}
 html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
   overflow:hidden;overscroll-behavior:none;touch-action:none;}
@@ -28,6 +31,21 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
   var(--bg-deep);}
 .star{position:absolute;background:#fff;border-radius:50%;opacity:.6;animation:twinkle 3s ease-in-out infinite;}
 @keyframes twinkle{0%,100%{opacity:.15}50%{opacity:.9}}
+
+/* Shooting star (spawned by scheduleShootingStars, ui.js). --dx/--dy/--dur are set per star.
+   The trail is a ::before gradient line. */
+.shootingStar{position:absolute;width:2px;height:2px;border-radius:50%;background:#fff;
+  box-shadow:0 0 6px 1px #fff, 0 0 14px 3px #8b5cf699;
+  animation:shootingStarMove var(--dur,1.1s) linear forwards;}
+.shootingStar::before{content:"";position:absolute;top:50%;right:0;width:56px;height:1px;
+  background:linear-gradient(90deg, transparent, #cbb8ff99);transform:translateY(-50%) rotate(var(--trail-angle,0deg));
+  transform-origin:right center;}
+@keyframes shootingStarMove{
+  0%{opacity:0;transform:translate(0,0);}
+  10%{opacity:1;}
+  85%{opacity:1;}
+  100%{opacity:0;transform:translate(var(--dx),var(--dy));}
+}
 
 .app{position:relative;z-index:1;height:100%;max-width:480px;margin:0 auto;
   display:flex;flex-direction:column;
@@ -42,6 +60,9 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 .currency.gems .value{color:var(--gems);}
 .currency.energy .value{color:var(--energy);}
 .currency.energy{flex:0 0 auto;}
+/* Stardust gets more room than Gems so its "+X/s" rate fits. */
+.currency.stardust{flex:1.6;}
+.currency.gems{flex:1.2;}
 .currency.gems,.currency.energy,.currency.stardust{cursor:pointer;}
 /* The owned amount (.value) must never truncate - it's the number that
    actually matters. If the pill runs out of room, the secondary "+X/s"
@@ -49,23 +70,36 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
    .rate had flex-shrink:0 and .value didn't, so the owned amount itself
    was the one getting cut off to "1.7…" under real device width. */
 .currency .rate{font-size:10px;color:var(--text-dim);margin-left:auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.iconBtn{appearance:none;border:1px solid #2a2450;background:var(--bg-panel);color:var(--text);
-  border-radius:10px;width:38px;height:38px;font-size:16px;flex-shrink:0;}
-.iconBtn:active{transform:scale(.92);}
+.iconBtn{appearance:none;border:1px solid #322a5e;color:var(--text);
+  background:radial-gradient(circle at 35% 30%,#2a2452,#181433 70%);
+  box-shadow:inset 0 1px 2px rgba(255,255,255,.06);
+  border-radius:13px;width:38px;height:38px;font-size:16px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  transition:transform .1s ease, border-color .15s ease;}
+.iconBtn:active{transform:scale(.92);border-color:#4a3f94;}
+.iconBtn img.uiIcon{width:76%;height:76%;object-fit:contain;}
 
 .toolbar{display:flex;align-items:center;gap:8px;margin-bottom:8px;min-height:40px;flex-wrap:wrap;}
-.btn{appearance:none;border:1px solid #322a5e;border-radius:12px;padding:10px 14px;font-size:14px;font-weight:700;
+.btn{appearance:none;border:1px solid #322a5e;border-radius:var(--radius);padding:10px 14px;font-size:14px;font-weight:700;
   color:var(--text);background:linear-gradient(180deg,#2a2452,#201a42);display:flex;align-items:center;gap:6px;
-  box-shadow:0 2px 8px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.05);
+  box-shadow:0 2px 8px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.06);
   transition:transform .1s ease, filter .15s ease, box-shadow .15s ease;}
 .btn:active{transform:scale(.95);}
-.btn.primary{background:linear-gradient(135deg,var(--accent),#5b21b6);border-color:#a78bfa77;box-shadow:0 4px 14px #8b5cf655, inset 0 1px 0 rgba(255,255,255,.15);}
+.btn.primary{background:linear-gradient(135deg,var(--accent),#5b21b6);border-color:#a78bfa77;box-shadow:0 4px 14px #8b5cf655, inset 0 1px 0 rgba(255,255,255,.18);}
 .btn.primary .cost{color:#fde68a;}
-.btn.invokeBtn{flex-direction:column;gap:2px;padding:9px 16px;}
-.invokeCosts{font-size:11px;font-weight:600;color:#fde68a;display:flex;align-items:center;gap:4px;}
-.invokeCostsSep{font-size:9px;color:#e0d5ff;font-weight:400;}
+.invokeSection{display:flex;flex-direction:column;gap:3px;}
+.invokeSectionLabel{font-size:10px;font-weight:700;color:var(--text-dim);
+  text-transform:uppercase;letter-spacing:.04em;padding-left:2px;}
+.invokeSectionRow{display:flex;gap:6px;}
+.invokeSectionRow .btn{padding:8px 12px;font-size:13px;}
+/* Swap button next to Invoquer. Teal like the Gems currency. */
+.swapSection{display:flex;flex-direction:column;gap:3px;}
+.swapCellsBtn{background:linear-gradient(135deg,#0891b2,#155e75);border-color:#22d3ee77;
+  box-shadow:0 3px 12px #0891b255;padding:8px 12px;font-size:13px;}
 .btn.bigbang{background:linear-gradient(135deg,#f59e0b,#dc2626);border-color:#fbbf2477;box-shadow:0 4px 16px #f59e0b66;animation:bigBangPulse 1.4s ease-in-out infinite;}
-.btn.ghost{background:transparent;border:1px solid #3a3070;box-shadow:none;}
+/* Dark backdrop so the warm Big Bang icon stands out on the orange button. */
+.btn.bigbang .inlineCurrencyIcon{background:radial-gradient(circle, rgba(0,0,0,.4) 0%, transparent 72%);border-radius:50%;}
+.btn.ghost{background:transparent;border:1px solid #4a3f8c;box-shadow:none;}
 .btn.danger{background:linear-gradient(135deg,#f87171,#7f1d1d);border-color:#fca5a577;}
 .btn:disabled,.btn.disabled{opacity:.5;filter:grayscale(.6);box-shadow:none;animation:none;}
 .btn.full{width:100%;justify-content:center;}
@@ -80,55 +114,186 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 .cell.locked{background:var(--locked);border-style:solid;cursor:pointer;}
 .cell.locked .lockLabel{display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--text-dim);font-size:10px;}
 .cell.locked .lockLabel .emoji{font-size:16px;}
+.cell.locked .lockLabel .emoji img{width:16px;height:16px;object-fit:contain;}
 .cell.selectableEmpty{outline:2px dashed var(--accent2);outline-offset:-2px;}
 .cell.selected{outline:2px solid var(--accent2);outline-offset:-2px;box-shadow:0 0 14px #22d3ee88;}
+/* Max-tier idle glow. box-shadow on .cell so it doesn't conflict with .tile animations. */
+.cell.tierMax{animation:tierMaxGlow 2.6s ease-in-out infinite;}
+@keyframes tierMaxGlow{
+  0%,100%{box-shadow:0 0 8px 1px #8b5cf655;}
+  50%{box-shadow:0 0 20px 5px #a78bfa99;}
+}
+.cell.tierMax .tile .emoji.tierIcon{animation:tierMaxBreathe 3.4s ease-in-out infinite;}
+@keyframes tierMaxBreathe{0%,100%{transform:scale(1);}50%{transform:scale(1.08);}}
 
 .tile{position:absolute;inset:2px;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  box-shadow:inset 0 0 10px rgba(255,255,255,.15), 0 2px 6px rgba(0,0,0,.4);transition:transform .12s ease;touch-action:none;}
+  box-shadow:inset 0 0 10px rgba(255,255,255,.15), 0 2px 6px rgba(0,0,0,.4);transition:transform .12s ease;touch-action:none;
+  z-index:5; /* above the flash/burst, below the ring and debris */}
 .tile .emoji{font-size:22px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5));}
+/* Artwork already has shading: no drop-shadow, sized relative to the tile. */
+.tile .emoji.tierIcon{width:68%;height:68%;object-fit:contain;filter:none;}
 .tile .tierNum{position:absolute;bottom:2px;right:4px;font-size:8px;font-weight:700;color:rgba(255,255,255,.65);}
+/* Loop counter badge, in the corner opposite .tierNum. */
+.tile .cycleBadge{position:absolute;top:2px;left:4px;font-size:8px;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,.7);}
+.tile.cycled{animation:cycleGlow 2.2s ease-in-out infinite;}
+@keyframes cycleGlow{
+  0%,100%{box-shadow:inset 0 0 10px rgba(255,255,255,.15), 0 2px 6px rgba(0,0,0,.4),
+    0 0 calc(4px + var(--cycle-intensity, 0) * 12px) calc(1px + var(--cycle-intensity, 0) * 3px) var(--cycle-color, transparent),
+    inset 0 0 8px var(--cycle-color, transparent);}
+  50%{box-shadow:inset 0 0 10px rgba(255,255,255,.15), 0 2px 6px rgba(0,0,0,.4),
+    0 0 calc(10px + var(--cycle-intensity, 0) * 20px) calc(2px + var(--cycle-intensity, 0) * 5px) var(--cycle-color, transparent),
+    inset 0 0 14px var(--cycle-color, transparent);}
+}
 .tile.dragging{opacity:0;}
-.tile.merging{animation:mergePop .28s ease;}
-@keyframes mergePop{0%{transform:scale(1)}45%{transform:scale(1.35)}100%{transform:scale(1)}}
+/* Merging tile bursts past its cell with a single expo-out overshoot. */
+.tile.merging{animation:mergePop .42s cubic-bezier(.16,1,.3,1);}
+/* box-shadow instead of filter:drop-shadow(): drop-shadow is expensive to animate. */
+@keyframes mergePop{
+  0%{transform:scale(.5) rotate(-5deg);filter:brightness(1);
+    box-shadow:inset 0 0 10px rgba(255,255,255,.15),0 2px 6px rgba(0,0,0,.4),0 0 0 rgba(251,191,36,0);}
+  55%{transform:scale(1.36) rotate(1.5deg);filter:brightness(1.7);
+    box-shadow:inset 0 0 10px rgba(255,255,255,.15),0 2px 6px rgba(0,0,0,.4),0 0 22px 6px rgba(251,191,36,.9);}
+  100%{transform:scale(1) rotate(0deg);filter:brightness(1);
+    box-shadow:inset 0 0 10px rgba(255,255,255,.15),0 2px 6px rgba(0,0,0,.4),0 0 0 rgba(251,191,36,0);}
+}
+/* Lifts the cell so the oversized tile isn't hidden by the next cells. */
+.cell.impactHero{z-index:20;}
 .tile.spawnIn{animation:spawnIn .25s ease;}
 @keyframes spawnIn{0%{transform:scale(0)}100%{transform:scale(1)}}
+
+/* One-shot pop on a newly unlocked cell (renderCell's opts.justUnlocked). */
+.cell.unlockPop{animation:unlockPop .6s cubic-bezier(.16,1,.3,1);}
+@keyframes unlockPop{
+  0%{transform:scale(.55);box-shadow:0 0 0 0 #fbbf2400;border-color:#fbbf24;}
+  45%{box-shadow:0 0 20px 6px #fbbf2488;}
+  100%{transform:scale(1);box-shadow:0 0 0 0 transparent;}
+}
+/* .autoClickTarget marks the auto-clicker's cell (toggled by tickAutoClicker, input.js).
+   .autoClickPulse flashes on each tap: keep it shorter than TAP_COOLDOWN_MS (150 ms). */
+.cell.autoClickTarget{box-shadow:0 0 0 2px #22d3ee88, 0 0 14px 2px #22d3ee33 inset;}
+.cell.autoClickPulse{animation:autoClickPulse .15s ease-out;}
+@keyframes autoClickPulse{
+  0%{box-shadow:0 0 0 2px #22d3ee88, 0 0 0 0 #22d3ee66;}
+  40%{box-shadow:0 0 0 2px #22d3eecc, 0 0 22px 8px #22d3ee55;}
+  100%{box-shadow:0 0 0 2px #22d3ee88, 0 0 0 0 #22d3ee00;}
+}
 
 .ghostTile{position:fixed;z-index:50;pointer-events:none;width:56px;height:56px;border-radius:10px;
   display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(0,0,0,.5);
   transform:translate(-50%,-50%) scale(1.1);}
 .ghostTile .emoji{font-size:26px;}
+.ghostTile .emoji.tierIcon{width:70%;height:70%;object-fit:contain;filter:none;}
 
-.particle{position:absolute;width:6px;height:6px;border-radius:50%;background:#fff;pointer-events:none;
-  animation:particleFly .5s ease-out forwards;}
-@keyframes particleFly{0%{opacity:1;transform:translate(0,0) scale(1);}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(.3);}}
-
-.floatBonus{position:absolute;left:50%;top:40%;transform:translate(-50%,0);pointer-events:none;
-  font-size:12px;font-weight:800;color:var(--stardust);text-shadow:0 1px 3px rgba(0,0,0,.6);
+.floatBonus{position:absolute;left:50%;top:40%;transform:translate(-50%,0);pointer-events:none;z-index:10;
+  /* above .tile's z-index:5, otherwise hidden behind the tile */
+  font-size:13px;font-weight:800;color:var(--stardust);text-shadow:0 1px 3px rgba(0,0,0,.6);
   animation:floatUp .75s ease-out forwards;white-space:nowrap;}
 @keyframes floatUp{0%{opacity:0;transform:translate(-50%,6px) scale(.8);}20%{opacity:1;transform:translate(-50%,0) scale(1.05);}
   100%{opacity:0;transform:translate(-50%,-26px) scale(1);}}
 
+/* Merge impact (playMeteorMerge, ui.js). Everything must feel instant: it plays on every merge.
+   --mergeBright/--mergeDark are the tile's gradient colors; the var() fallbacks are defaults. */
+.chargeGlow{position:absolute;top:50%;left:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,247,227,.95),rgba(var(--mergeBright,251,191,36),.55) 55%,transparent 75%);
+  filter:blur(1.5px);animation:chargeGlow .11s cubic-bezier(.4,0,.2,1) forwards;
+  z-index:6;pointer-events:none;}
+@keyframes chargeGlow{0%{transform:scale(.15);opacity:0;}100%{transform:scale(3.2);opacity:.95;}}
+
+/* Flash from the impact point (--fx/--fy in viewport px). Its reach scales with --fpower,
+   so only big merges fill the screen. */
+.screenFlash{position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:80;pointer-events:none;
+  background:radial-gradient(circle at var(--fx,50%) var(--fy,45%),
+    rgba(255,247,227,calc(.7 * var(--fpower,1))),
+    rgba(var(--mergeBright,251,191,36),calc(.3 * var(--fpower,1))) calc(13% * var(--fpower,1)),
+    transparent calc(34% * var(--fpower,1)));
+  animation:screenFlash .38s ease-out forwards;}
+@keyframes screenFlash{0%{opacity:0;}10%{opacity:1;}100%{opacity:0;}}
+
+/* Starburst: separate thin faded rays (a conic-gradient looked like flat wedges).
+   --ang: ray angle. --burstPower: reach. */
+.burstRay{position:absolute;left:50%;top:50%;width:3.5px;height:36px;margin:-36px -1.75px 0 -1.75px;
+  transform-origin:50% 100%;border-radius:2px;pointer-events:none;z-index:2;
+  background:linear-gradient(to top,rgba(var(--mergeBright,255,213,120),1),rgba(255,255,255,.6) 45%,transparent 100%);
+  animation:burstRay .32s cubic-bezier(.16,1,.3,1) forwards;}
+.burstRay.short{height:21px;margin-top:-21px;opacity:.8;}
+@keyframes burstRay{
+  0%{transform:rotate(var(--ang,0deg)) scaleY(.2);opacity:0;}
+  35%{opacity:1;}
+  100%{transform:rotate(var(--ang,0deg)) scaleY(calc(1 * var(--burstPower,1)));opacity:0;}
+}
+
+.impactFlash{position:absolute;inset:0;border-radius:12px;pointer-events:none;z-index:3;
+  background:radial-gradient(circle,rgba(255,247,227,1),rgba(var(--mergeBright,251,146,36),.45) 45%,transparent 72%);
+  animation:impactFlash .26s ease-out forwards;}
+@keyframes impactFlash{0%{opacity:0;transform:scale(.3);}20%{opacity:1;}100%{opacity:0;transform:scale(1.4);}}
+
+.impactRing{position:absolute;left:50%;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;
+  border-radius:50%;border:3px solid rgba(var(--mergeBright,255,213,120),1);pointer-events:none;z-index:8;
+  box-shadow:0 0 14px 2px rgba(var(--mergeBright,251,191,36),.6);
+  animation:impactRing .42s ease-out forwards;}
+@keyframes impactRing{0%{transform:scale(.3);opacity:1;}100%{transform:scale(calc(10.5 * var(--ringPower,1)));opacity:0;}}
+
+/* Whole-grid shake. --shakePower scales the amplitude. */
+.grid.gridShake{animation:gridImpactShake .3s cubic-bezier(.36,.07,.19,.97);}
+@keyframes gridImpactShake{
+  0%{transform:translate(0,0);}
+  25%{transform:translate(calc(-7.5px * var(--shakePower,1)),calc(5px * var(--shakePower,1)));}
+  50%{transform:translate(calc(5px * var(--shakePower,1)),calc(-3.5px * var(--shakePower,1)));}
+  75%{transform:translate(calc(-2.5px * var(--shakePower,1)),calc(1.5px * var(--shakePower,1)));}
+  100%{transform:translate(0,0);}
+}
+
+/* Rock chips and sparkles, sized per chip with --chipScale. */
+.debrisChip{position:absolute;left:50%;top:50%;width:6px;height:6px;border-radius:1px;pointer-events:none;z-index:9;
+  background:linear-gradient(135deg,rgb(var(--mergeBright,255,207,133)),rgb(var(--mergeDark,124,62,15)));
+  animation:debrisFly .52s cubic-bezier(.2,.7,.4,1) forwards;}
+.debrisChip.spark{width:5px;height:5px;border-radius:50%;background:radial-gradient(circle,#fff9e6,var(--stardust));
+  box-shadow:0 0 5px 1px rgba(251,191,36,.75);}
+@keyframes debrisFly{
+  0%{opacity:1;transform:translate(0,0) rotate(0deg) scale(var(--chipScale,1));}
+  55%{opacity:1;}
+  100%{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(var(--rot)) scale(calc(.35 * var(--chipScale,1)));}
+}
+
 .quickActions{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;}
-.fab{flex:0 0 auto;appearance:none;display:flex;align-items:center;gap:7px;padding:8px 13px;border-radius:12px;
+/* Pill-shaped fab with a soft glow and a round icon badge. */
+.fab{flex:0 0 auto;appearance:none;display:flex;align-items:center;gap:8px;padding:7px 14px 7px 7px;border-radius:18px;
   border:1px solid #3a3070;background:linear-gradient(180deg,#241f52,#1a1640);color:var(--text);
-  font-size:13px;font-weight:700;box-shadow:0 3px 10px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.05);
+  font-size:13px;font-weight:700;box-shadow:0 3px 12px rgba(0,0,0,.4), 0 0 0 1px #8b5cf61a, inset 0 1px 0 rgba(255,255,255,.06);
   transition:transform .1s ease, box-shadow .15s ease, border-color .15s ease;}
 .fab:active{transform:scale(.95);}
-.fabIcon{font-size:17px;line-height:1;}
+.fabIcon{width:28px;height:28px;border-radius:50%;flex-shrink:0;font-size:15px;line-height:1;
+  display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 35% 30%,#3a3170,#211c46 70%);
+  border:1px solid rgba(255,255,255,.08);box-shadow:inset 0 1px 2px rgba(255,255,255,.08);}
+.fabIcon img.uiIcon{width:74%;height:74%;object-fit:contain;}
 .fabLabel{white-space:nowrap;}
 /* These two labels alternate between a fixed string ("Boost x2", "+8 Gems")
    and a countdown ("5s" vs "12s" vs "1m 30s") - without a stable width, the
    fab's own width changes every tick, which in a flex-wrap row can bump it
    to a different line each time the digit count changes (the "ça bouge,
    deuxième ligne, troisième ligne" bug). */
-#fabBoostLabel,#fabGemsAdLabel{display:inline-block;min-width:52px;text-align:center;font-variant-numeric:tabular-nums;}
+#fabAutoClickerLabel,#fabGemsAdLabel{display:inline-block;min-width:52px;text-align:center;font-variant-numeric:tabular-nums;}
 .fab.ready{border-color:var(--accent2);box-shadow:0 0 0 2px #22d3ee44, 0 3px 10px rgba(0,0,0,.35);animation:fabPulse 1.6s ease-in-out infinite;}
 @keyframes fabPulse{0%,100%{box-shadow:0 0 0 2px #22d3ee44, 0 3px 10px rgba(0,0,0,.35)}50%{box-shadow:0 0 0 4px #22d3ee66, 0 3px 10px rgba(0,0,0,.35)}}
 .fab.active{border-color:var(--stardust);background:linear-gradient(180deg,#3a2a0d,#241f52);}
 .fab.active .fabLabel{color:var(--stardust);font-variant-numeric:tabular-nums;}
 .fab:disabled{opacity:.4;}
-.fab.muted{opacity:.5;padding:8px 11px;background:linear-gradient(180deg,#1c1838,#151230);}
-.fab.muted:active{opacity:.85;}
+/* One-shot pop when a fab first appears (revealFab, ui.js). */
+.fab.fabReveal{animation:fabRevealPop .5s cubic-bezier(.16,1,.3,1);}
+@keyframes fabRevealPop{
+  0%{transform:scale(.3);opacity:0;}
+  60%{transform:scale(1.12);opacity:1;}
+  100%{transform:scale(1);opacity:1;}
+}
+/* Richer reveal for Cadeau, the first fab a new player sees. */
+.fab.fabReveal.gift{animation:fabRevealGift .7s cubic-bezier(.16,1,.3,1);}
+@keyframes fabRevealGift{
+  0%{transform:scale(.2) rotate(-14deg);opacity:0;box-shadow:0 0 0 0 #fbbf2400;}
+  40%{transform:scale(1.18) rotate(7deg);opacity:1;box-shadow:0 0 22px 8px #fbbf2499;}
+  65%{transform:scale(.92) rotate(-3deg);box-shadow:0 0 14px 4px #fbbf2455;}
+  100%{transform:scale(1) rotate(0deg);opacity:1;box-shadow:0 0 0 0 #fbbf2400;}
+}
 /* The two ad-for-currency fabs (boost, gems) are the ones we most want
    watched, per explicit request to make them stand out from the rest of
    the row rather than blend in as just another same-weight button. */
@@ -139,8 +304,9 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 .bannerAd{height:50px;background:#1a1533;border:1px dashed #3a3070;border-radius:8px;display:flex;
   align-items:center;justify-content:center;font-size:11px;color:var(--text-dim);margin-top:6px;flex-shrink:0;}
 
+/* z-index 110: above every overlay (drawer 90, panel 95, modals 100), so toasts are always visible. */
 .toastContainer{position:fixed;left:0;right:0;bottom:calc(var(--safe-bottom) + 14px);display:flex;flex-direction:column;
-  align-items:center;gap:6px;z-index:80;pointer-events:none;}
+  align-items:center;gap:6px;z-index:110;pointer-events:none;}
 .toast{background:#1c1740ee;border:1px solid #3a3070;padding:8px 14px;border-radius:20px;font-size:13px;
   box-shadow:0 4px 14px rgba(0,0,0,.4);animation:toastIn .18s ease, toastOut .3s ease 1.7s forwards;max-width:80vw;text-align:center;}
 @keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
@@ -170,19 +336,41 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 .drawerSubtitle:empty{display:none;}
 
 .drawerItem{appearance:none;width:100%;box-sizing:border-box;border:1px solid #2a2450;background:var(--bg-panel2);color:var(--text);
-  border-radius:12px;padding:13px 14px;font-size:14px;font-weight:600;text-align:left;display:flex;align-items:center;gap:12px;
-  transition:transform .1s ease, background .15s ease;flex-shrink:0;}
-.drawerItem:active{transform:scale(.97);background:#211b4d;}
-.drawerIcon{width:32px;height:32px;border-radius:10px;background:#251f57;display:flex;align-items:center;
-  justify-content:center;font-size:16px;flex-shrink:0;}
+  border-radius:var(--radius);padding:13px 14px;font-size:14px;font-weight:600;text-align:left;display:flex;align-items:center;gap:12px;
+  transition:transform .1s ease, background .15s ease, border-color .15s ease;flex-shrink:0;}
+.drawerItem:active{transform:scale(.97);background:#211b4d;border-color:#4a3f94;}
+/* Same round badge as .fabIcon. */
+.drawerIcon{width:34px;height:34px;border-radius:50%;flex-shrink:0;font-size:16px;
+  display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 35% 30%,#372d70,#211c46 70%);
+  border:1px solid rgba(255,255,255,.07);box-shadow:inset 0 1px 2px rgba(255,255,255,.08);}
+.drawerIcon img.uiIcon{width:74%;height:74%;object-fit:contain;}
 .drawerItem.close{margin-top:14px;padding-top:16px;border:none;border-top:1px solid #2a2450;border-radius:0;background:transparent;color:var(--text-dim);}
-.drawerItem.close .drawerIcon{background:transparent;}
+.drawerItem.close .drawerIcon{background:transparent;border-color:transparent;}
 
 .notifDot{width:9px;height:9px;border-radius:50%;background:var(--danger);margin-left:auto;flex-shrink:0;
   box-shadow:0 0 0 2px #2a1030, 0 0 6px #f87171aa;}
 
 /* Full-screen panel */
 .panelOverlay{position:fixed;inset:0;background:var(--bg-deep);z-index:95;display:flex;justify-content:center;}
+/* Gods panel ambiance: nebula gradients, star-dot texture, pulsing glow, gold headers. */
+.panelOverlay.godsTheme{
+  background:
+    radial-gradient(ellipse 120% 50% at 50% -5%, #6d3fa855 0%, transparent 60%),
+    radial-gradient(ellipse 90% 45% at 15% 100%, #b8860b33 0%, transparent 55%),
+    radial-gradient(ellipse 70% 40% at 90% 80%, #2a1a5e66 0%, transparent 55%),
+    radial-gradient(circle, #ffffff22 .5px, transparent .5px) 0 0/26px 26px,
+    radial-gradient(circle, #ffffff16 .5px, transparent .5px) 13px 13px/26px 26px,
+    var(--bg-deep);
+}
+.panelOverlay.godsTheme::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(circle at 50% 15%, #f7b73333 0%, transparent 45%);
+  animation:godsGlowPulse 5s ease-in-out infinite;
+}
+@keyframes godsGlowPulse{0%,100%{opacity:.45;}50%{opacity:1;}}
+.panelOverlay.godsTheme .panelHeader h2{color:var(--stardust);text-shadow:0 0 12px #f7b73355;}
+.panelOverlay.godsTheme .panelBody>h3{border-left-color:var(--stardust);}
 .panel{width:100%;max-width:480px;height:100%;display:flex;flex-direction:column;box-sizing:border-box;
   padding:calc(var(--safe-top) + 8px) 18px calc(var(--safe-bottom) + 8px);}
 .panelHeader{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
@@ -203,7 +391,33 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 .card.compact h3{font-size:13px;}
 .card.compact p.desc{font-size:11px;margin-bottom:6px;}
 .card h3{margin:0 0 4px;font-size:14px;}
-.vipCard{border-color:var(--stardust);box-shadow:0 0 0 1px var(--stardust) inset, 0 0 16px #f7b73333;}
+
+/* Gold premium look shared by every "Offres Premium" card. .iapHero (the Pass) overrides
+   it by coming later in the file. */
+.iapCard{position:relative;border-color:#f7b73377;
+  box-shadow:0 2px 8px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.05), 0 0 0 1px #f7b73322;
+  animation:iapGlowSmall 3.2s ease-in-out infinite;}
+@keyframes iapGlowSmall{
+  0%,100%{box-shadow:0 2px 8px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.05), 0 0 0 1px #f7b73322;}
+  50%{box-shadow:0 2px 8px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.05), 0 0 0 1px #f7b73366;}
+}
+.iapHero{background:linear-gradient(160deg,#2a2154,#181233 60%,#241a3a);
+  border-color:var(--stardust);border-radius:18px;padding:20px 18px 18px;margin-bottom:8px;
+  box-shadow:0 0 0 1px #f7b73333 inset, 0 6px 24px #f7b73322;
+  animation:iapGlow 3.2s ease-in-out infinite;}
+.iapHero h3{font-size:17px;}
+.iapHero .iapPrice{font-size:16px;}
+.iapHeroBadge{position:absolute;top:-11px;left:16px;background:linear-gradient(135deg,#fde68a,var(--stardust));
+  color:#2b1a02;font-size:11px;font-weight:800;padding:4px 12px;border-radius:20px;
+  box-shadow:0 3px 10px #f7b73355;letter-spacing:.01em;}
+.iapHeroTagline{margin:0 0 12px;font-size:12.5px;color:var(--accent2);font-weight:600;}
+.iapPerkList{list-style:none;margin:0 0 16px;padding:0;display:flex;flex-direction:column;gap:8px;}
+.iapPerkList li{position:relative;padding-left:24px;font-size:13px;color:var(--text);line-height:1.35;}
+.iapPerkList li::before{content:"✦";position:absolute;left:0;top:0;color:var(--stardust);font-size:13px;}
+@keyframes iapGlow{
+  0%,100%{box-shadow:0 0 0 1px #f7b73333 inset, 0 6px 24px #f7b73322;}
+  50%{box-shadow:0 0 0 1px #f7b733aa inset, 0 6px 30px #f7b73355;}
+}
 
 /* Two-per-row shop tiles (shop gem-services + the shared cosmetic grid) -
    was one full-width card each, which the button dominated far more than
@@ -215,6 +429,9 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 .shopGrid2 .card .tag{font-size:9px;}
 .shopGrid2 .card .btn{padding:7px;font-size:11px;margin-top:8px;}
 
+/* Emoji/Illustrated toggle */
+.iconStyleToggle{display:flex;gap:8px;}
+.iconStyleToggle .btn{flex:1;justify-content:center;padding:8px;font-size:12.5px;}
 .cosmeticGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 .cosmeticTile{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px;
   background:var(--bg-card);border:1px solid #2a2450;border-radius:14px;text-align:center;}
@@ -222,15 +439,32 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 .skinSwatch{width:44px;height:44px;border-radius:12px;flex-shrink:0;border:1px solid #2a2450;
   display:flex;align-items:center;justify-content:center;font-size:20px;}
 .skinSwatch.big{width:56px;height:56px;font-size:26px;}
+.skinSwatch img{width:80%;height:80%;object-fit:contain;}
 .cosmeticName{font-size:12px;font-weight:700;line-height:1.25;}
 .cosmeticTile .tag{margin:-2px 0 2px;}
 .cosmeticTile .btn{padding:7px 10px;font-size:11px;width:auto;min-width:70px;}
+.cosmeticPreviewBtn{padding:5px 10px;font-size:10.5px;width:auto;min-width:0;margin-top:2px;}
 
-.purchaseCheckAnim{font-size:48px;line-height:1;margin:6px auto 10px;animation:cosmicBoxReveal .4s ease-out;}
+/* Skin preview: mini grid of every tier with a staggered pulse (--stagger).
+   Opened from inside other modals, so it needs a higher z-index than the shared 100. */
+#skinPreviewModal{z-index:101;}
+/* Can open on top of other modals (shop, skin manager, promos, god picker). */
+#confirmActionModal{z-index:102;}
+.skinPreviewCard{max-width:360px;}
+.skinPreviewGrid{display:grid;grid-template-columns:repeat(5, 1fr);gap:8px;margin:4px 0 16px;}
+.skinPreviewGrid .cell{animation:previewPulse 2.8s ease-in-out infinite;animation-delay:var(--stagger, 0s);}
+@keyframes previewPulse{
+  0%,100%{box-shadow:0 0 0 0 transparent;transform:scale(1);}
+  50%{box-shadow:0 0 10px 2px #8b5cf655;transform:scale(1.04);}
+}
+
+.purchaseCheckAnim{line-height:1;margin:6px auto 10px;animation:cosmicBoxReveal .4s ease-out;}
+.purchaseCheckAnim img{width:56px;height:56px;object-fit:contain;}
 .cosmicBoxCard{text-align:center;}
 .cosmicBoxAnim{font-size:52px;line-height:1;margin:10px auto 16px;width:88px;height:88px;
   display:flex;align-items:center;justify-content:center;border-radius:20px;
   background:radial-gradient(circle at 35% 30%, #2a2450, #14102a);border:2px solid #3a3070;}
+.cosmicBoxPortrait{width:76px;height:76px;object-fit:contain;}
 .cosmicBoxAnim.spinning{animation:cosmicBoxSpin .6s ease-in-out infinite;}
 @keyframes cosmicBoxSpin{0%,100%{transform:scale(1) rotate(0deg);}50%{transform:scale(1.12) rotate(8deg);}}
 .cosmicBoxAnim.revealed{border-color:var(--rarity-color, var(--accent2));
@@ -238,16 +472,107 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
   animation:cosmicBoxReveal .4s ease-out;}
 @keyframes cosmicBoxReveal{0%{transform:scale(.4);opacity:0;}70%{transform:scale(1.15);}100%{transform:scale(1);opacity:1;}}
 
+/* ---- Secret 4-egg challenge (see EASTER_EGGS in config.js) ---- */
+#secretsList{display:flex;flex-direction:column;gap:10px;margin:4px 0 12px;}
+.eggPipsRow{display:flex;gap:8px;justify-content:center;margin:4px 0 14px;font-size:20px;letter-spacing:2px;}
+.eggPip{color:#3a3070;transition:color .3s ease;}
+.eggPip.filled{color:var(--stardust);text-shadow:0 0 10px #fbbf2488;}
+.eggPip.justFilled{animation:eggPipFill .6s cubic-bezier(.16,1,.3,1);}
+@keyframes eggPipFill{
+  0%{transform:scale(.3);color:#3a3070;text-shadow:none;}
+  55%{transform:scale(1.5);}
+  100%{transform:scale(1);}
+}
+.eggFoundCard{text-align:center;}
+.eggFoundIcon{display:block;width:64px;height:64px;object-fit:contain;margin:4px auto 8px;animation:cosmicBoxReveal .4s ease-out;}
+
+/* Grand finale: fullscreen, above every modal, with a staged reveal (.eggFinaleStage.revealed).
+   Compound selector so it beats the later .modalOverlay base rule. */
+.modalOverlay.eggFinaleOverlay{z-index:300;background:radial-gradient(circle at 50% 40%,#1a0f3a,#020103 75%);overflow:hidden;}
+.eggFinaleStage{position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;
+  max-width:380px;width:100%;padding:20px;}
+.eggFinaleBurst{position:absolute;top:70px;left:50%;width:0;height:0;pointer-events:none;}
+.eggFinaleRay{position:absolute;top:0;left:0;width:3px;height:170px;transform-origin:top center;
+  background:linear-gradient(to bottom, #f472e0, transparent 75%);
+  transform:rotate(var(--ang,0deg)) scaleY(0);opacity:0;
+  animation:eggFinaleRay 1.6s ease-out forwards;filter:blur(.3px);}
+.eggFinaleRay.short{height:100px;opacity:.7;}
+@keyframes eggFinaleRay{
+  0%{transform:rotate(var(--ang,0deg)) scaleY(0);opacity:0;}
+  30%{opacity:1;}
+  100%{transform:rotate(var(--ang,0deg)) scaleY(1);opacity:0;}
+}
+.eggFinaleSparkles{position:absolute;inset:0;overflow:hidden;pointer-events:none;}
+.eggFinaleSparkle{position:absolute;top:-5%;width:4px;height:4px;border-radius:50%;
+  background:#fff;box-shadow:0 0 6px 2px #f472e0aa;
+  animation:eggFinaleSparkleFall var(--fallDur,3s) linear var(--fallDelay,0s) infinite;}
+@keyframes eggFinaleSparkleFall{
+  0%{transform:translate(0,0);opacity:0;}
+  10%{opacity:1;}
+  90%{opacity:1;}
+  100%{transform:translate(var(--drift,0),115vh);opacity:0;}
+}
+.eggFinalePortrait{position:relative;width:110px;height:110px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:56px;
+  background:radial-gradient(circle at 35% 30%,#3a2450,#0e0a1e);
+  border:2px solid #f472e0;box-shadow:0 0 0 3px #f472e055, 0 0 40px #f472e099;
+  margin:10px 0 16px;opacity:0;transform:scale(.5);
+  transition:opacity .8s ease, transform .8s cubic-bezier(.16,1,.3,1);}
+.eggFinalePortraitImg{width:88%;height:88%;object-fit:contain;border-radius:50%;}
+.eggFinaleStage.revealed .eggFinalePortrait{opacity:1;transform:scale(1);animation:eggFinalePulse 2.4s ease-in-out infinite 1s;}
+@keyframes eggFinalePulse{0%,100%{box-shadow:0 0 0 3px #f472e055, 0 0 40px #f472e099;}50%{box-shadow:0 0 0 5px #f472e088, 0 0 60px #f472e0cc;}}
+.eggFinaleKicker{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);
+  opacity:0;transition:opacity .6s ease .2s;}
+.eggFinaleTitle{font-size:22px;font-weight:800;letter-spacing:.03em;margin:4px 0 10px;
+  background:linear-gradient(90deg,#f472e0,#fbbf24,#f472e0);background-size:200% auto;
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  opacity:0;transition:opacity .6s ease .4s;}
+.eggFinaleGodName{font-size:19px;font-weight:800;color:#fff;opacity:0;transition:opacity .6s ease 1.2s;}
+.eggFinaleGodTitle{font-size:13px;color:#f472e0;margin-bottom:10px;opacity:0;transition:opacity .6s ease 1.4s;}
+.eggFinaleDesc{font-size:12.5px;color:var(--text-dim);line-height:1.5;opacity:0;transition:opacity .6s ease 1.6s;}
+.eggFinaleStage.revealed .eggFinaleKicker,
+.eggFinaleStage.revealed .eggFinaleTitle,
+.eggFinaleStage.revealed .eggFinaleGodName,
+.eggFinaleStage.revealed .eggFinaleGodTitle,
+.eggFinaleStage.revealed .eggFinaleDesc{opacity:1;}
+.eggFinaleStage.revealed .eggFinaleTitle{animation:eggFinaleTitleShine 3s linear infinite;}
+@keyframes eggFinaleTitleShine{0%{background-position:0% center;}100%{background-position:200% center;}}
+#eggFinaleClose{margin-top:16px;}
+body.eggFinaleShake{animation:eggFinaleShake .55s cubic-bezier(.36,.07,.19,.97);}
+@keyframes eggFinaleShake{
+  0%,100%{transform:translate(0,0);}
+  20%{transform:translate(-6px,4px);}
+  40%{transform:translate(6px,-4px);}
+  60%{transform:translate(-4px,-3px);}
+  80%{transform:translate(4px,3px);}
+}
+
+/* Profile ring reward for finding all 4 secrets (renderDrawerHead, ui.js). */
+.drawerLogo.mythicFrame{position:relative;}
+.drawerLogo.mythicFrame::before{content:"";position:absolute;inset:-4px;border-radius:14px;
+  background:conic-gradient(from 0deg,#f472e0,#fbbf24,#38bdf8,#f472e0);
+  z-index:-1;animation:mythicFrameSpin 3s linear infinite;}
+@keyframes mythicFrameSpin{to{transform:rotate(360deg);}}
+
 .skinManagerList{display:flex;flex-direction:column;gap:8px;margin-top:10px;max-height:60vh;overflow-y:auto;}
 .storyCard{position:relative;background:linear-gradient(160deg,#1a1640,#141130);border-color:#3a3070;}
 .storyCard h3{font-size:14px;color:#e8e4ff;}
 .storyCard.locked{opacity:.5;}
 .storyCard.locked h3{color:var(--text-dim);}
-.storyMark{position:absolute;top:10px;right:14px;font-size:34px;opacity:.12;pointer-events:none;}
+.storyMark{position:absolute;top:10px;right:14px;width:40px;height:40px;object-fit:contain;opacity:.12;pointer-events:none;}
 .card p.desc{margin:0 0 8px;font-size:12px;color:var(--text-dim);line-height:1.5;white-space:pre-line;}
 .card .rowBetween,.modalCard .rowBetween{display:flex;align-items:center;justify-content:space-between;gap:8px;}
-.tag{font-size:10px;padding:2px 7px;border-radius:8px;background:#2a2450;color:var(--text-dim);}
+/* Stacked layout when the value is a full sentence. */
+.modalCard .rowBetween.stack{flex-direction:column;align-items:flex-start;gap:2px;}
+.modalCard .rowBetween.stack strong{font-size:12px;font-weight:600;color:var(--text-dim);}
+/* min-width:0 lets the title wrap so the card never grows wider than its column. */
+.card .rowBetween h3{min-width:0;}
+.shopGrid2 .card{min-width:0;}
+/* The pill never wraps or shrinks. */
+.tag{font-size:10px;padding:2px 7px;border-radius:8px;background:#2a2450;color:var(--text-dim);white-space:nowrap;flex-shrink:0;}
 .tag.owned{background:#134e2c;color:var(--success);}
+/* Pass daily Gems value badge (passGemsValueBadgeText, ui.js) */
+.tag.value{background:#4a3a12;color:var(--stardust);margin-left:4px;}
 .tag.equipped{background:#3730a3;color:#c7d2fe;}
 
 .progressBar{height:8px;border-radius:5px;background:#241f47;overflow:hidden;margin:6px 0;}
@@ -255,6 +580,18 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 
 .skillRow .rowBetween{margin-top:6px;}
 .skillLevel{font-size:11px;color:var(--text-dim);}
+/* Ascension and Alchimie cards, 2 per row. min-width:0 and smaller text so they fit at half width. */
+.skillGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:stretch;}
+.skillGrid .card{padding:10px;min-width:0;display:flex;flex-direction:column;}
+.skillGrid .card h3{font-size:12.5px;margin-bottom:3px;}
+.skillGrid .card p.desc{font-size:10.5px;line-height:1.3;margin-bottom:6px;}
+.skillGrid .skillLevel{font-size:10px;}
+.skillGrid .card .btn{padding:8px;font-size:11.5px;margin-top:auto;}
+.skillGrid .skillEffects{font-size:10px;flex-direction:column;gap:2px;}
+/* Current vs next-level effect on Ascension and Alchimie cards. */
+.skillEffects{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 10px;font-size:11px;margin:0 0 8px;}
+.skillEffects .effectCurrent{color:var(--text-dim);}
+.skillEffects .effectNext{color:var(--accent2);font-weight:700;}
 
 .tabs{display:flex;gap:6px;margin-bottom:6px;}
 .tabBtn{flex:1;padding:8px;border-radius:10px;background:var(--bg-panel2);border:1px solid #2a2450;
@@ -279,7 +616,22 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 .modalCard h3,.tutCard h3{margin:0 0 8px;font-size:17px;color:var(--accent2);}
 .modalCard p{margin:0 0 10px;font-size:13px;line-height:1.5;color:var(--text-dim);white-space:pre-line;}
 .modalCard .modalWarn{color:#fca5a5;font-size:11px;}
+/* Tier artwork inline in text (tierInlineIconHtml, ui.js) */
+.inlineTierIcon{width:18px;height:18px;object-fit:contain;vertical-align:-4px;margin:0 1px;}
+/* God portrait inline next to a name. Round because it's a face. */
+.godInlineIcon{width:24px;height:24px;object-fit:contain;object-position:top;border-radius:50%;
+  vertical-align:-6px;margin:0 1px;}
+/* Currency icon inline in text (currencyIconHtml, ui.js) */
+.inlineCurrencyIcon{width:16px;height:16px;object-fit:contain;vertical-align:-3px;margin:0 1px;}
+.currency .icon .inlineCurrencyIcon{width:20px;height:20px;vertical-align:-5px;margin:0;}
+/* The 3-sparkle Stardust icon looks small at the same size, so it gets a bigger box. */
+.inlineCurrencyIcon[src*="stardust.png"]{width:19px;height:19px;}
+.currency .icon .inlineCurrencyIcon[src*="stardust.png"]{width:24px;height:24px;}
+.confirmDontAskRow{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-dim);margin-top:4px;cursor:pointer;}
+.confirmDontAskRow input{width:16px;height:16px;accent-color:var(--accent2);flex-shrink:0;}
 .modalBtns{display:flex;gap:8px;margin-top:10px;}
+/* .modalCard has no gap, so the button needs its own margin. */
+#wheelClose{margin-top:10px;}
 .modalBtns .btn{flex:1;justify-content:center;}
 .saveCodeText{width:100%;box-sizing:border-box;background:#0c0920;border:1px solid #2a2450;border-radius:10px;
   color:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;padding:10px;
@@ -307,11 +659,28 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 .dayCell.today{outline:2px solid var(--accent2);}
 .dayCell .dNum{font-size:9px;color:var(--text-dim);}
 
-.wheelWrap{position:relative;width:180px;height:180px;margin:10px auto;}
+/* Wheel and legend side by side; wraps to stacked on narrow modals. */
+.wheelLayout{display:flex;align-items:center;gap:14px;margin:10px 0;flex-wrap:wrap;}
+.wheelWrap{position:relative;width:150px;height:150px;flex-shrink:0;}
+/* Background is set by buildWheelSegments() (ui.js) from WHEEL_PRIZES weights.
+   overflow:hidden clips the dividers to the circle. */
 .wheel{width:100%;height:100%;border-radius:50%;border:4px solid var(--accent);
-  background:conic-gradient(from 0deg,#3730a3 0 51deg,#7c3aed 51deg 103deg,#2563eb 103deg 154deg,#0891b2 154deg 206deg,#be185d 206deg 257deg,#f59e0b 257deg 283deg,#dc2626 283deg 360deg);
+  position:relative;overflow:hidden;box-shadow:0 0 0 2px #05040a, 0 4px 20px rgba(0,0,0,.5);
   transition:transform 3.5s cubic-bezier(.17,.67,.2,1);display:flex;align-items:center;justify-content:center;font-size:11px;}
+/* Divider lines between slices, rotated around the wheel center. */
+.wheelDivider{position:absolute;left:50%;top:50%;width:1px;height:50%;
+  background:rgba(5,4,10,.5);transform-origin:top center;pointer-events:none;z-index:1;}
+.wheelHub{position:absolute;left:50%;top:50%;width:22px;height:22px;margin:-11px 0 0 -11px;
+  border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff8e6,var(--accent2) 55%,var(--accent) 100%);
+  box-shadow:0 0 0 2px #05040a,0 2px 8px rgba(0,0,0,.5);pointer-events:none;z-index:3;}
 .wheelPointer{position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:20px;color:var(--accent2);}
+/* Prize legend; swatch colors match the slices (buildWheelSegments, ui.js). */
+.wheelLegend{display:flex;flex-direction:column;gap:7px;flex:1;min-width:120px;}
+.wheelLegendItem{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--text);}
+.wheelLegendSwatch{width:11px;height:11px;border-radius:3px;flex-shrink:0;box-shadow:0 0 0 1px rgba(255,255,255,.2);}
+.wheelLegendItem .inlineCurrencyIcon{width:15px;height:15px;vertical-align:-3px;}
+/* Reserve the result line so the modal doesn't grow when the spin lands. */
+#wheelResult{min-height:20px;}
 
 /* Ad / IAP simulation overlay */
 .simOverlay{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;}
@@ -339,15 +708,18 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 .godTile.locked{opacity:.5;border-color:#2a2450;}
 .godTile.equipped{box-shadow:0 0 0 1px var(--accent2) inset, 0 0 14px #22d3ee44;}
 .godTileEmoji{font-size:30px;line-height:1;}
+.godTilePortrait{width:54px;height:54px;object-fit:contain;}
 .godTileName{font-size:11px;font-weight:700;text-align:center;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
 .godTileTitle{font-size:9px;color:var(--text-dim);text-align:center;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
 .godTileBadge{position:absolute;top:4px;right:4px;font-size:11px;background:#0d2a30;color:var(--accent2);
   width:16px;height:16px;border-radius:5px;display:flex;align-items:center;justify-content:center;}
-.godTileBadge.queued{background:#3a2a0d;color:var(--stardust);}
 
 .godTop{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
 .godEmoji{width:42px;height:42px;border-radius:12px;background:#1a1640;display:flex;align-items:center;
   justify-content:center;font-size:22px;flex-shrink:0;border:1px solid #2a2450;}
+/* Bigger portrait in the detail modal. */
+.godDetailEmoji{width:96px;height:96px;border-radius:18px;font-size:44px;}
+.godDetailPortrait{width:88px;height:88px;object-fit:contain;}
 .godNames{flex:1;min-width:0;}
 .godName{font-size:15px;font-weight:800;}
 .godTitle{font-size:11px;color:var(--text-dim);}
@@ -358,14 +730,22 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 .godUnlockInfo{font-size:11px;color:var(--text-dim);margin-top:6px;}
 .equippedTag{font-size:9px;font-weight:800;color:var(--accent2);
   background:#0d2a30;padding:2px 8px;border-radius:8px;text-transform:uppercase;white-space:nowrap;}
-.equippedTag.queued{color:var(--stardust);background:#3a2a0d;}
 .godPower{margin-top:10px;padding-top:10px;border-top:1px solid #2a2450;}
 .godPowerLabel{font-size:11px;color:var(--text-dim);}
 
-.godRitualList{display:flex;flex-direction:column;gap:10px;margin-top:12px;max-height:50vh;overflow-y:auto;}
-.godRitualCard{background:var(--bg-card);border:1px solid var(--accent2);border-radius:14px;padding:12px;
-  display:flex;align-items:center;gap:12px;text-align:left;appearance:none;color:var(--text);width:100%;}
+/* Two gods side by side (benevolent and fallen). */
+.godRitualList{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}
+.godRitualCard{background:var(--bg-card);border:1px solid var(--accent2);border-radius:14px;padding:14px 10px;
+  display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;appearance:none;color:var(--text);width:100%;}
 .godRitualCard:active{transform:scale(.98);}
+/* Same blue/red as the two camps in the Histoire panel. */
+.godRitualCard.bienveillant{border-color:#93c5fd88;box-shadow:0 0 14px #93c5fd22;}
+.godRitualCard.dechu{border-color:#fca5a588;box-shadow:0 0 14px #fca5a522;}
+.godRitualCard .godEmoji{width:44px;height:44px;font-size:24px;margin-bottom:2px;}
+.godRitualPortrait{width:44px;height:44px;object-fit:contain;}
+.godRitualCard .godName{font-size:14px;font-weight:800;}
+.godRitualCard .godTitle{font-size:10.5px;color:var(--text-dim);}
+.godRitualCard .godDesc{font-size:11px;color:#c9c3f0;margin:4px 0 0;line-height:1.35;}
 
 .progressCard .rowBetween,.modalCard .rowBetween{margin-bottom:4px;}
 .roadmap{position:relative;padding:4px;}
@@ -381,6 +761,7 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 /* dim only the glyph, not .roadIcon itself - opacity on the icon would also
    fade its solid background, letting the connecting line bleed through it */
 .roadNode.locked .roadIconGlyph{opacity:.45;filter:grayscale(1);}
+.roadIconGlyph .inlineTierIcon{width:26px;height:26px;vertical-align:middle;margin:0;}
 .roadLabel{font-size:13px;font-weight:700;}
 .roadNode.done .roadLabel{color:var(--text-dim);}
 .roadNode.locked .roadLabel{color:var(--text-dim);opacity:.7;}

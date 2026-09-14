@@ -17,16 +17,23 @@ function createGhost(tier, x, y) {
   const g = document.createElement("div");
   g.className = "ghostTile";
   g.style.cssText += tierStyle(tier);
-  g.innerHTML = `<span class="emoji">${tierEmoji(tier)}</span>`;
+  g.appendChild(tierIconNode(tier));
   g.style.left = x + "px"; g.style.top = y + "px";
   document.body.appendChild(g);
   return g;
 }
 
 let pointerState = null;
+let pointerWatchdog = null;
 
+// A touch fires both pointerdown and touchstart, and webviews can drop up/cancel events.
+// Without these guards a tile could stay stuck invisible under an orphaned drag ghost:
+// - ignore a new pointerdown while a gesture is tracked
+// - clean up on pointercancel/touchcancel
+// - a watchdog timeout cancels a gesture that never ends
 function onPointerDown(e) {
   if (!dom.panelOverlay.classList.contains("hidden") || !dom.drawerOverlay.classList.contains("hidden")) return;
+  if (pointerState) return; // gesture already tracked, see note above
   const pos = localPos(e);
   const idx = cellIdxAtPoint(pos.x, pos.y);
   if (idx === null) return;
@@ -42,8 +49,32 @@ function onPointerDown(e) {
   pointerState = { idx, startX: pos.x, startY: pos.y, dragging: false, ghostEl: null };
   window.addEventListener("pointermove", onPointerMove);
   window.addEventListener("pointerup", onPointerUp);
+  window.addEventListener("pointercancel", onPointerCancel);
   window.addEventListener("touchmove", onPointerMove, { passive: false });
   window.addEventListener("touchend", onPointerUp);
+  window.addEventListener("touchcancel", onPointerCancel);
+  clearTimeout(pointerWatchdog);
+  pointerWatchdog = setTimeout(() => { if (pointerState) onPointerCancel(); }, 6000);
+}
+
+function endPointerListeners() {
+  window.removeEventListener("pointermove", onPointerMove);
+  window.removeEventListener("pointerup", onPointerUp);
+  window.removeEventListener("pointercancel", onPointerCancel);
+  window.removeEventListener("touchmove", onPointerMove);
+  window.removeEventListener("touchend", onPointerUp);
+  window.removeEventListener("touchcancel", onPointerCancel);
+  clearTimeout(pointerWatchdog);
+}
+
+// Gesture interrupted (system gesture, focus loss, watchdog). Cleans up without merging.
+function onPointerCancel() {
+  if (!pointerState) return;
+  const { idx, ghostEl } = pointerState;
+  endPointerListeners();
+  pointerState = null;
+  if (ghostEl) ghostEl.remove();
+  cellEls[idx].querySelector(".tile")?.classList.remove("dragging");
 }
 
 function onPointerMove(e) {
@@ -51,7 +82,7 @@ function onPointerMove(e) {
   const pos = localPos(e);
   const dx = pos.x - pointerState.startX, dy = pos.y - pointerState.startY;
   if (!pointerState.dragging && Math.hypot(dx, dy) > DRAG_THRESHOLD) {
-    if (Game.swapArmed) return; // swap mode is tap-only, see handleSwapTap
+    if (Game.swapArmed || Game.autoClickerArmed) return; // tap-only modes
     const tileData = Game.state.grid[pointerState.idx];
     if (!tileData) return;
     pointerState.dragging = true;
@@ -67,10 +98,7 @@ function onPointerMove(e) {
 
 function onPointerUp(e) {
   if (!pointerState) return;
-  window.removeEventListener("pointermove", onPointerMove);
-  window.removeEventListener("pointerup", onPointerUp);
-  window.removeEventListener("touchmove", onPointerMove);
-  window.removeEventListener("touchend", onPointerUp);
+  endPointerListeners();
 
   const pos = localPos(e);
   const { idx, dragging, ghostEl } = pointerState;
@@ -111,9 +139,10 @@ function handleSwapTap(idx) {
     return;
   }
   const idxA = Game.swapFirstIdx, idxB = idx;
-  const result = buyGemShopItem(state, "swapCells", { idxA, idxB });
+  const result = buyGemShopItem(state, "swapCells", { idxA, idxB, free: Game.swapFree });
   Game.swapArmed = false;
   Game.swapFirstIdx = null;
+  Game.swapFree = false;
   clearSelection();
   if (result.ok) { Sfx.purchase(); toast("Cases échangées !"); }
   else { Sfx.error(); toast(result.reason === "funds" ? "Pas assez de Gems." : "Échange impossible."); }
@@ -123,60 +152,87 @@ function handleSwapTap(idx) {
 
 function handleTap(idx) {
   if (Game.swapArmed) { handleSwapTap(idx); return; }
+  if (Game.autoClickerArmed) { handleAutoClickerPick(idx); return; }
   const state = Game.state;
   const tileHere = state.grid[idx];
 
-  if (Game.selectedIdx !== null && Game.selectedIdx !== idx) {
-    const selTile = state.grid[Game.selectedIdx];
-    if (selTile && tileHere && areAdjacent(idx, Game.selectedIdx) && selTile.tier === tileHere.tier) {
-      attemptMerge(Game.selectedIdx, idx);
-      clearSelection();
-      return;
-    }
-  }
-  if (Game.selectedIdx === idx) {
-    clearSelection();
-    if (tileHere) grantTapBonus(idx);
+  if (tileHere) {
+    // Merging is drag-only: tapping a tile always grants the tap bonus.
+    grantTapBonus(idx);
     return;
   }
+  // Empty cell: tap selects/deselects it as the next invocation's target.
+  if (Game.selectedIdx === idx) { clearSelection(); return; }
   selectCell(idx);
-  if (tileHere) grantTapBonus(idx);
 }
 
 function handleLockedTap(idx) {
   const state = Game.state;
   if (Game.swapArmed) { toast("Choisis deux cases débloquées pour l'échange."); Sfx.error(); return; }
+  if (Game.autoClickerArmed) { toast("Choisis une case débloquée avec une tuile."); Sfx.error(); return; }
   if (Game.skipCellArmed) {
     const result = buyGemShopItem(state, "skipCell", { cellIndex: idx });
     Game.skipCellArmed = false;
     if (result.ok) { Sfx.unlock(); toast("Case débloquée avec des Gems !"); }
     else { Sfx.error(); toast(result.reason === "funds" ? "Pas assez de Gems." : "Impossible de débloquer cette case."); }
     renderAll();
+    if (result.ok) {
+      renderCell(idx, { justUnlocked: true }); // unlock animation on top of renderAll()
+      triggerResonanceIfLucky(state);
+      // Résonance raises unlockCost() after renderAll(), so refresh the displayed prices.
+      refreshLockedCellPrices();
+    }
     saveState(state);
     return;
   }
   tryUnlock(idx);
 }
 
+// Merges closer than this count as a streak (raises the combo chime, see Sfx.meteorImpact).
+const MERGE_STREAK_WINDOW_MS = 900;
+
 function attemptMerge(fromIdx, toIdx) {
   const state = Game.state;
   const before = state.grid[fromIdx];
-  if (before && before.tier >= TIERS.length) { Sfx.error(); toast("L'Univers ne peut pas fusionner davantage."); return; }
+  if (!before) return;
   const result = performMerge(state, fromIdx, toIdx);
   if (!result) return;
+  const now = performance.now();
+  Game.mergeStreak = (now - Game.lastMergeAt < MERGE_STREAK_WINDOW_MS) ? Game.mergeStreak + 1 : 0;
+  Game.lastMergeAt = now;
+  // Easter egg "La Cascade": rolling window of recent merge times, kept in memory only.
+  Game.mergeChainTimes.push(now);
+  Game.mergeChainTimes = Game.mergeChainTimes.filter(t => now - t <= EASTER_EGG_CHAIN_MS);
+  const chainEggResult = Game.mergeChainTimes.length >= EASTER_EGG_CHAIN_COUNT
+    ? unlockEasterEgg(state, "merge_chain") : null;
   renderCell(fromIdx);
-  renderCell(toIdx, { merged: true });
-  spawnParticles(toIdx);
-  Sfx.merge(result.newTier);
-  HapticService.impact(result.newTier >= 8 ? "heavy" : "medium");
-  if (result.gemBonus) toast("+1 💎 Gem bonus !");
-  if (result.newTier === TIERS.length) toast("Univers créé ! 💥");
-  else toast(tierName(result.newTier) + " " + tierEmoji(result.newTier) + " !");
+  // Keep the old tile visible and delay every reward cue until the impact (~110 ms later).
+  renderMergeStandIn(toIdx, before.tier, before.cycle || 0);
+  playMeteorMerge(toIdx, () => {
+    renderCell(toIdx, { merged: true });
+    HapticService.impact(result.newTier >= 8 ? "heavy" : "medium");
+    if (result.gemBonus) toast("+1 💎 Gem bonus !");
+    if (result.looped) {
+      toast(`✨ Nouvelle boucle amorcée - palier ×${result.newCycle} !`);
+    } else if (result.newTier === UNIVERSE_TIER) {
+      // Univers is the Big Bang milestone, so its toast replays on every loop.
+      toast("Univers créé ! 💥");
+    } else if (result.newTier === TIERS.length) {
+      toast(`${tierName(result.newTier)} atteint(e) - le sommet de la Création ! 🌟`);
+    } else {
+      toast(tierName(result.newTier) + " " + tierEmoji(result.newTier) + " !");
+    }
+    maybeOpenGodRitual();
+    maybeOpenGodRevealModal();
+    if (result.eggResult) revealEasterEgg(result.eggResult);
+    if (chainEggResult) revealEasterEgg(chainEggResult);
+  }, Game.mergeStreak, result.newTier);
+  Sfx.meteorImpact(result.newTier, Game.mergeStreak);
   updateHeader();
   updateFabs();
   saveState(state);
-  maybeOpenGodRitual();
   maybeOpenBigBangPrompt();
+  maybeOpenFusionPromo();
 }
 
 // A toast alone was easy to miss - a player who reaches the Universe tile
@@ -189,6 +245,15 @@ function maybeOpenBigBangPrompt() {
   setTimeout(openBigBangModal, 700);
 }
 
+// Opens the VIP daily Gems modal queued by grantVipDailyGemsIfDue() (retention.js).
+function maybeOpenVipGemsModal() {
+  if (Game.pendingVipGems) {
+    const amount = Game.pendingVipGems;
+    Game.pendingVipGems = null;
+    openVipGemsModal(amount);
+  }
+}
+
 function maybeOpenGodRitual() {
   if (Game.pendingGodRitual) {
     Game.pendingGodRitual = false;
@@ -196,22 +261,57 @@ function maybeOpenGodRitual() {
   }
 }
 
-function grantTapBonus(idx) {
+// Shows one queued god reveal (see unlockGod, gods.js). Waits while the ritual picker is open.
+// closeGodUnlockModal (ui.js) and onChooseGod call this again to show the next one.
+function maybeOpenGodRevealModal() {
+  if (Game.pendingGodReveals.length === 0) return;
+  if (!$("godRitualModal").classList.contains("hidden")) return;
+  const godId = Game.pendingGodReveals.shift();
+  openGodUnlockModal(godId);
+}
+
+// Delayed like maybeOpenBigBangPrompt so the merge effect lands first.
+function maybeOpenFusionPromo() {
+  if (!Game.pendingPromo) return;
+  const kind = Game.pendingPromo;
+  Game.pendingPromo = null;
+  setTimeout(() => openFusionPromoModal(kind), 700);
+}
+
+// Returns the Stardust granted, or 0 if the cell is empty or on cooldown (usable as a boolean).
+// `opts.auto`: tap from the auto-clicker. Same reward, but it must not:
+// - reset the Erebus streak (the challenge forbids taps by the player only)
+// - play a sound or save at ~7 times per second (the main loop already saves every second)
+function grantTapBonus(idx, opts) {
   const now = performance.now();
-  if (Game.cooldownUntil[idx] > now) return false;
+  if (Game.cooldownUntil[idx] > now) return 0;
   const state = Game.state;
   const tile = state.grid[idx];
-  if (!tile) return false;
-  const bonus = 5 * effectiveTileProd(state, tile.tier);
+  if (!tile) return 0;
+  const auto = opts && opts.auto;
+  const bonus = 5 * effectiveTileProd(state, tile);
   grantStardust(state, bonus);
   updateQuestProgress(state, "tapBonuses", 1);
-  resetErebusStreak(state);
+  if (!auto) resetErebusStreak(state);
   Game.cooldownUntil[idx] = now + TAP_COOLDOWN_MS;
-  Sfx.tap();
+  if (!auto) Sfx.tap();
   spawnFloatingBonus(idx, bonus);
   updateHeader();
-  saveState(state);
-  return true;
+  if (!auto) saveState(state);
+  return bonus;
+}
+
+// "Résonance" roll after a gameplay unlock. Shared so all 3 unlock paths give the same feedback
+// and the bonus cell counts for quests and achievements.
+function triggerResonanceIfLucky(state) {
+  const idx = maybeTriggerResonance(state);
+  if (idx === null) return;
+  updateQuestProgress(state, "unlockCells", 1);
+  checkAchievements(state);
+  Sfx.unlock();
+  toast("Résonance ! Une case bonus s'est débloquée ✨");
+  renderCell(idx, { justUnlocked: true });
+  updateFabs();
 }
 
 function tryUnlock(idx) {
@@ -226,9 +326,12 @@ function tryUnlock(idx) {
   checkAchievements(state);
   Sfx.unlock();
   toast("Case débloquée !");
-  renderCell(idx);
+  renderCell(idx, { justUnlocked: true });
+  triggerResonanceIfLucky(state);
   refreshLockedCellPrices(); // every other locked cell's price just changed too
   updateHeader();
+  // Hides the "Case gratuite" fab once the last cell is unlocked.
+  updateFabs();
   saveState(state);
 }
 
@@ -312,7 +415,12 @@ function tickAutoSpawn(now) {
 async function watchRewardedAd(state, placementId) {
   if (adsRemoved(state)) return true;
   const ok = await AdService.showRewarded(placementId);
-  if (ok && trackRewardedAdWatched(state)) openRemoveAdsPromptModal();
+  // The remove-ads promo also needs enough fusions and the shared promo gap.
+  if (ok && trackRewardedAdWatched(state) && state.lifetime.fusions >= FUSIONS_BEFORE_REMOVE_ADS_PROMO && promoGapElapsed(state)) {
+    state.promptsShown.removeAdsPrompt = true;
+    markPromoShown(state);
+    openRemoveAdsPromptModal();
+  }
   return ok;
 }
 
@@ -330,7 +438,7 @@ async function maybeShowInterstitial() {
 function onBigBangConfirm() {
   const state = Game.state;
   const runRecap = { stardustEarned: state.runStardustEarned, maxTier: state.maxTierThisRun };
-  const gain = performBigBang(state);
+  const { gain, eggResult } = performBigBang(state);
   Game.bigBangPromptShown = false;
   Sfx.bigBang();
   HapticService.impact("success");
@@ -339,10 +447,15 @@ function onBigBangConfirm() {
   saveState(state);
   maybeShowInterstitial();
   openBigBangSummaryModal({ ...runRecap, gain });
+  // Shown after the Big Bang summary, not instead of it.
+  if (eggResult) revealEasterEgg(eggResult);
+  maybeOpenGodRevealModal(); // e.g. Thanatos, unlocked inside performBigBang
 }
 
 function onRestartConfirm() {
   const state = Game.state;
+  // Easter egg "Le Renoncement": restart while Big Bang is available. Check before the reset.
+  const eggResult = hasUniverseTile(state) ? unlockEasterEgg(state, "restart_at_top") : null;
   restartRun(state);
   Game.bigBangPromptShown = false;
   Sfx.bigBang();
@@ -352,6 +465,7 @@ function onRestartConfirm() {
   toast("Nouvelle partie !");
   renderAll();
   saveState(state);
+  if (eggResult) revealEasterEgg(eggResult);
 }
 
 async function onSaveCodeAction() {
@@ -413,117 +527,227 @@ function onDailyClaim() {
 }
 
 // ---------------- Wheel actions ----------------
-function spinVisual(cb) {
+const WHEEL_SPIN_MS = 3500; // must match .wheel's CSS transition duration (style.css)
+
+// Wheel clicks at a slowing rate, approximating the CSS ease-out.
+function scheduleWheelTicks(totalMs) {
+  let elapsed = 0;
+  let interval = 45;
+  const growth = 1.09;
+  const maxInterval = 260;
+  function tick() {
+    if (elapsed >= totalMs) return;
+    Sfx.wheelTick();
+    interval = Math.min(interval * growth, maxInterval);
+    elapsed += interval;
+    setTimeout(tick, interval);
+  }
+  tick();
+}
+// The prize is picked before the animation; this rotates the wheel so the top pointer
+// lands inside that prize's slice (random offset within the middle 60%).
+// Rotation accumulates across spins and always moves forward, so a second spin
+// in the same modal still turns.
+let wheelRotation = 0;
+function spinVisual(prizeIndex, cb) {
   const wheel = $("wheelEl");
-  const extra = 1440 + Math.floor(Math.random() * 360);
-  wheel.style.transform = `rotate(${extra}deg)`;
-  setTimeout(cb, 3500);
+  const { startDeg, endDeg } = wheelSegmentBounds(prizeIndex);
+  const span = endDeg - startDeg;
+  const jitter = (Math.random() - 0.5) * span * 0.6;
+  const midDeg = (startDeg + endDeg) / 2 + jitter;
+  const desiredMod = (360 - midDeg + 360) % 360; // rotation that puts midDeg under the top pointer
+  const currentMod = ((wheelRotation % 360) + 360) % 360;
+  const forwardDelta = (desiredMod - currentMod + 360) % 360; // forward-only rotation to the target
+  const extraSpins = (4 + Math.floor(Math.random() * 2)) * 360;
+  wheelRotation += extraSpins + forwardDelta;
+  wheel.style.transform = `rotate(${wheelRotation}deg)`;
+  scheduleWheelTicks(WHEEL_SPIN_MS);
+  setTimeout(cb, WHEEL_SPIN_MS);
+}
+// renderAll(): the "1 case débloquée" prize changes state.unlocked, so the grid must redraw.
+function finishWheelSpin(prize) {
+  $("wheelResult").innerHTML = prize ? `Gagné : ${withCurrencyIcons(prize.label)}` : "Déjà utilisé aujourd'hui.";
+  Sfx.wheelWin();
+  refreshWheelButtons();
+  renderAll();
+  saveState(Game.state);
 }
 function onWheelSpinFree() {
   $("wheelSpinFree").disabled = true; $("wheelSpinAd").disabled = true;
-  spinVisual(() => {
-    const prize = spinWheel(Game.state, false);
-    $("wheelResult").textContent = prize ? `Gagné : ${prize.label}` : "Déjà utilisé aujourd'hui.";
-    Sfx.chest();
-    refreshWheelButtons();
-    updateHeader(); updateFabs();
-    saveState(Game.state);
-  });
+  const prize = spinWheel(Game.state, false);
+  spinVisual(prize ? WHEEL_PRIZES.indexOf(prize) : 0, () => finishWheelSpin(prize));
 }
 async function onWheelSpinAd() {
   $("wheelSpinFree").disabled = true; $("wheelSpinAd").disabled = true;
   const ok = await watchRewardedAd(Game.state, "wheel_bonus");
   if (!ok) { refreshWheelButtons(); return; }
-  spinVisual(() => {
-    const prize = spinWheel(Game.state, true);
-    $("wheelResult").textContent = prize ? `Gagné : ${prize.label}` : "Déjà utilisé aujourd'hui.";
-    Sfx.chest();
-    refreshWheelButtons();
-    updateHeader(); updateFabs();
-    saveState(Game.state);
-  });
-}
-
-// ---------------- Free planet fab ----------------
-async function onFreePlanet() {
-  const state = Game.state;
-  if (Date.now() < state.cooldowns.freePlanetUntil) {
-    toast("Disponible dans " + formatDuration(state.cooldowns.freePlanetUntil - Date.now()));
-    return;
-  }
-  if (!adsRemoved(state)) toast("📺 Chargement de la publicité...");
-  const ok = await watchRewardedAd(state, "free_planet");
-  if (!ok) return;
-  const result = grantFreePlanet(state);
-  if (result.ok) { renderCell(result.idx, { spawned: true }); Sfx.spawn(); toast("🪐 Planète gratuite reçue !"); }
-  else { toast("La grille est pleine !"); }
-  updateFabs();
-  saveState(state);
+  const prize = spinWheel(Game.state, true);
+  spinVisual(prize ? WHEEL_PRIZES.indexOf(prize) : 0, () => finishWheelSpin(prize));
 }
 
 // ---------------- Unlock cell fab (rewarded ad) ----------------
-async function onUnlockCellAd() {
+// Asks before showing an ad. Skipped when ads are removed: the reward is granted instantly.
+function confirmThenWatchAd(state, title, text, action) {
+  if (adsRemoved(state)) { action(); return; }
+  openConfirmModal({ title, text, confirmLabel: "Regarder la pub", onConfirm: action });
+}
+
+function onUnlockCellAd() {
   const state = Game.state;
   if (Date.now() < state.cooldowns.unlockCellAdUntil) {
     toast("Disponible dans " + formatDuration(state.cooldowns.unlockCellAdUntil - Date.now()));
     return;
   }
   if (unlockedCount(state) >= TOTAL) { toast("Toutes les cases sont déjà débloquées !"); return; }
-  if (!adsRemoved(state)) toast("📺 Chargement de la publicité...");
-  const ok = await watchRewardedAd(state, "unlock_cell");
-  if (!ok) return;
-  const result = grantFreeCellUnlock(state);
-  if (result.ok) {
-    renderCell(result.idx);
-    refreshLockedCellPrices();
-    Sfx.unlock();
-    toast("🔓 Case débloquée gratuitement !");
-  } else {
-    toast("Toutes les cases sont déjà débloquées !");
-  }
-  updateHeader();
-  updateFabs();
-  saveState(state);
+  confirmThenWatchAd(state, "Case gratuite", "Regarder une publicité pour débloquer une case gratuitement ?", async () => {
+    if (!adsRemoved(state)) toast("📺 Chargement de la publicité...");
+    const ok = await watchRewardedAd(state, "unlock_cell");
+    if (!ok) return;
+    const result = grantFreeCellUnlock(state);
+    if (result.ok) {
+      renderCell(result.idx, { justUnlocked: true });
+      triggerResonanceIfLucky(state);
+      refreshLockedCellPrices();
+      Sfx.unlock();
+      toast("🔓 Case débloquée gratuitement !");
+    } else {
+      toast("Toutes les cases sont déjà débloquées !");
+    }
+    updateHeader();
+    updateFabs();
+    saveState(state);
+  });
 }
 
 // ---------------- Gems-for-ad (shop + home screen) ----------------
-async function onWatchGemsAd() {
+// The first claim of the day is free, then ads with a streak and cooldown (economy.js).
+function onWatchGemsAd() {
   const state = Game.state;
+  if (isGemsAdFreeAvailable(state)) {
+    const granted = grantGemsFree(state);
+    Sfx.purchase();
+    toast(`+${granted} 💎 offertes aujourd'hui !`);
+    refreshCurrentPanel();
+    updateHeader();
+    updateFabs();
+    saveState(state);
+    return;
+  }
   if (Date.now() < state.cooldowns.gemsAdUntil) {
     toast("Disponible dans " + formatDuration(state.cooldowns.gemsAdUntil - Date.now()));
     return;
   }
-  if (!adsRemoved(state)) toast("📺 Chargement de la publicité...");
-  const ok = await watchRewardedAd(state, "gems_ad");
-  if (!ok) return;
-  const granted = grantGemsFromAd(state);
+  confirmThenWatchAd(state, "Pub contre Gems", `Regarder une publicité pour recevoir ${GEMS_AD_REWARD} Gems ?`, async () => {
+    if (!adsRemoved(state)) toast("📺 Chargement de la publicité...");
+    const ok = await watchRewardedAd(state, "gems_ad");
+    if (!ok) return;
+    const granted = grantGemsFromAd(state);
+    Sfx.purchase();
+    toast(`+${granted} 💎 !`);
+    refreshCurrentPanel();
+    updateHeader();
+    updateFabs();
+    saveState(state);
+  });
+}
+
+// ---------------- Auto-clicker ----------------
+// Free once a day, then an ad. The player then picks the target cell (tap-only mode).
+function onAutoClickerClick() {
+  const state = Game.state;
+  if (Game.autoClickerArmed) {
+    Game.autoClickerArmed = false;
+    toast(Game.autoClickerPaid ? "Sélection annulée. Ta publicité reste acquise." : "Sélection annulée.");
+    renderAll();
+    return;
+  }
+  const now = Date.now();
+  if (state.autoClicker.activeUntil > now) {
+    toast("Clicker déjà actif encore " + formatDuration(state.autoClicker.activeUntil - now));
+    return;
+  }
+  // Game.autoClickerPaid: the watched ad stays earned if the picker is cancelled.
+  if (isAutoClickerFreeAvailable(state) || Game.autoClickerPaid) { armAutoClickerPicker(); return; }
+  confirmThenWatchAd(state, "Clicker automatique",
+    "Ton clicker gratuit du jour est déjà utilisé. Regarde une publicité pour le relancer tout de suite, pour 10 minutes de plus.",
+    async () => {
+      if (!adsRemoved(state)) toast("📺 Chargement de la publicité...");
+      const ok = await watchRewardedAd(state, "auto_clicker");
+      if (!ok) return;
+      Game.autoClickerPaid = true;
+      armAutoClickerPicker();
+    });
+}
+function armAutoClickerPicker() {
+  Game.autoClickerArmed = true;
+  closePanel(); // needed from the Boutique card: the grid must be visible
+  toast("🤖 Choisis une case avec une tuile pour le clicker automatique.");
+  renderAll();
+}
+function handleAutoClickerPick(idx) {
+  const state = Game.state;
+  if (!state.unlocked[idx] || !state.grid[idx]) { toast("Choisis une case débloquée avec une tuile."); Sfx.error(); return; }
+  Game.autoClickerArmed = false;
+  Game.autoClickerPaid = false; // the watched ad is spent now
+  activateAutoClicker(state, idx);
   Sfx.purchase();
-  toast(`+${granted} 💎 !`);
-  refreshCurrentPanel();
-  updateHeader();
+  toast("🤖 Clicker automatique activé pour 10 min !");
+  renderAll();
   updateFabs();
   saveState(state);
 }
-
-// ---------------- Shop / IAP / skills / quests handlers ----------------
-async function onWatchProdBoostAd() {
+// Called every frame. grantTapBonus handles the per-cell cooldown, so no throttling here.
+function tickAutoClicker() {
   const state = Game.state;
-  const boostActive = state.cooldowns.prodBoostActiveUntil > Date.now();
-  if (boostActive) { toast("Boost déjà actif encore " + formatDuration(state.cooldowns.prodBoostActiveUntil - Date.now())); return; }
-  if (Date.now() < state.cooldowns.prodBoostUntil) {
-    toast("Disponible dans " + formatDuration(state.cooldowns.prodBoostUntil - Date.now()));
+  const ac = state.autoClicker;
+  const idx = ac.targetIdx;
+  const isActive = idx !== null && ac.activeUntil > Date.now();
+  if (idx !== null && cellEls[idx]) cellEls[idx].classList.toggle("autoClickTarget", isActive);
+  if (!isActive || !state.grid[idx]) return; // inactive, or target cell empty (paused)
+  if (grantTapBonus(idx, { auto: true })) playAutoClickEffect(idx);
+}
+// No timer removes the class: it would cut the next pulse short.
+function playAutoClickEffect(idx) {
+  const cell = cellEls[idx];
+  if (!cell) return;
+  cell.classList.remove("autoClickPulse");
+  void cell.offsetWidth; // force reflow to restart the animation
+  cell.classList.add("autoClickPulse");
+}
+// Home-screen swap button: confirmation with "don't ask again".
+// The Boutique card already confirms through buyBtn() (ui.js).
+function onSwapCellsClick() {
+  const state = Game.state;
+  const cost = SHOP_GEM_ITEMS.find(i => i.id === "swapCells").cost;
+  // Not enough Gems: offer an ad for a free swap instead.
+  if (state.gems < cost) {
+    if (Date.now() < state.cooldowns.swapAdUntil) {
+      toast("Disponible dans " + formatDuration(state.cooldowns.swapAdUntil - Date.now()));
+      return;
+    }
+    confirmThenWatchAd(state, "Pas assez de Gems",
+      `Il te manque des Gems pour échanger deux cases (${cost} ${currencyIconHtml("gems")} nécessaires). Regarder une publicité pour échanger gratuitement à la place ?`,
+      async () => {
+        if (!adsRemoved(state)) toast("📺 Chargement de la publicité...");
+        const ok = await watchRewardedAd(state, "swap_cells_free");
+        if (!ok) return;
+        state.cooldowns.swapAdUntil = Date.now() + SWAP_AD_COOLDOWN_MS;
+        Game.swapArmed = true;
+        Game.swapFree = true;
+        toast("Choisis deux cases à échanger.");
+        renderAll();
+        saveState(state);
+      });
     return;
   }
-  if (!adsRemoved(state)) toast("📺 Chargement de la publicité...");
-  const ok = await watchRewardedAd(state, "prod_boost");
-  if (!ok) return;
-  activateProdBoost(state);
-  Sfx.purchase();
-  toast("🚀 Boost x2 production activé pour 10 min !");
-  refreshCurrentPanel();
-  updateHeader();
-  updateFabs();
-  saveState(state);
+  if (state.dontAskAgain.swapConfirm) { onBuyGemItem("swapCells"); return; }
+  openConfirmModal({
+    title: "Échanger deux cases",
+    text: `Dépenser ${cost} ${currencyIconHtml("gems")} pour échanger le contenu de deux cases ?`,
+    confirmLabel: "Échanger",
+    dontAskKey: "swapConfirm",
+    onConfirm: () => onBuyGemItem("swapCells"),
+  });
 }
 function onBuyGemItem(itemId) {
   if (itemId === "skipCell") {
@@ -537,6 +761,8 @@ function onBuyGemItem(itemId) {
     if (Game.state.gems < SHOP_GEM_ITEMS.find(i => i.id === "swapCells").cost) { Sfx.error(); toast("Pas assez de Gems."); return; }
     Game.swapArmed = true;
     Game.swapFirstIdx = null;
+    // Paid swap: clear any leftover free swap from an abandoned ad-earned one.
+    Game.swapFree = false;
     closePanel();
     toast("Choisis deux cases à échanger.");
     renderAll();
@@ -547,6 +773,9 @@ function onBuyGemItem(itemId) {
   Sfx.purchase();
   if (itemId === "cosmicBox") {
     openCosmicBoxRevealModal(result.box);
+  } else if (itemId === "streakFreeze") {
+    // No visible change otherwise, so the toast names the effect and the charge count.
+    toast("❄️ Gel de série ajouté ! (" + Game.state.dailyLogin.streakFreezeCharges + " en réserve)");
   } else {
     toast("Achat effectué !");
   }
@@ -570,6 +799,14 @@ function onCosmeticAction(id, owned) {
   refreshCurrentPanel();
   saveState(state);
 }
+function onSetIconStyle(style) {
+  const state = Game.state;
+  if (state.iconStyle === style) return;
+  state.iconStyle = style;
+  renderAll();
+  refreshCurrentPanel();
+  saveState(state);
+}
 async function onBuyIAP(productId) {
   const product = IAP_CATALOG.find(p => p.id === productId);
   const res = await IAPService.purchase(productId);
@@ -578,10 +815,16 @@ async function onBuyIAP(productId) {
   switch (productId) {
     case "remove_ads": state.iap.removeAds = true; break;
     case "starter_pack":
+      // One-time purchase: never grant twice.
+      if (state.iap.starterPack) break;
+      state.iap.starterPack = true;
       state.gems += 500; state.lifetime.gemsEarned += 500;
       { const locked = []; for (let i = 0; i < TOTAL; i++) if (!state.unlocked[i]) locked.push(i);
         for (let k = 0; k < 3 && locked.length; k++) { const pick = locked.splice(Math.floor(Math.random() * locked.length), 1)[0]; state.unlocked[pick] = true; state.extraUnlockedCount += 1; } }
-      state.cooldowns.prodBoostActiveUntil = Date.now() + 3600000;
+      // 1h auto-clicker on the highest-tier tile. keepFreeDaily: doesn't consume today's free use.
+      { let bestIdx = null, bestTier = 0;
+        for (let i = 0; i < TOTAL; i++) { const t = state.grid[i]; if (t && t.tier > bestTier) { bestTier = t.tier; bestIdx = i; } }
+        if (bestIdx !== null) activateAutoClicker(state, bestIdx, { durationMs: 3600000, keepFreeDaily: true }); }
       break;
     case "gems_small": case "gems_medium": case "gems_large": case "gems_mega":
       state.gems += product.amount; state.lifetime.gemsEarned += product.amount; break;
@@ -596,20 +839,20 @@ async function onBuyIAP(productId) {
 }
 async function onRestorePurchases() {
   await IAPService.restorePurchases();
-  toast("Achats restaurés (simulation).");
+  toast("Achats restaurés.");
   refreshCurrentPanel();
 }
 function onChooseGod(godId) {
   const state = Game.state;
-  const hadCurrent = !!state.gods.currentGodId;
-  const wasQueued = state.gods.nextGodId;
   chooseGod(state, godId);
   Sfx.purchase();
-  if (!hadCurrent) toast(`${getGod(godId).name} t'accompagne désormais !`);
-  else if (wasQueued && !state.gods.nextGodId) toast("Choix annulé.");
-  else toast(`${getGod(godId).name} choisi pour le prochain Big Bang.`);
+  toast(`${getGod(godId).name} t'accompagne désormais !`);
   refreshCurrentPanel();
   saveState(state);
+}
+function onEquipGodFromUnlockModal() {
+  if (godUnlockModalGodId) onChooseGod(godUnlockModalGodId);
+  closeGodUnlockModal();
 }
 function onBuyGod(godId) {
   const result = buyGodWithGems(Game.state, godId);
@@ -617,6 +860,7 @@ function onBuyGod(godId) {
   refreshCurrentPanel();
   updateHeader();
   saveState(Game.state);
+  maybeOpenGodRevealModal();
 }
 function onBuyGodPower(godId) {
   const result = buyGodPowerLevel(Game.state, godId);
@@ -645,6 +889,15 @@ function onBuySkill(key) {
   if (!result.ok) { Sfx.error(); toast(result.reason === "max" ? "Niveau maximum atteint." : "Pas assez d'Énergie Cosmique."); return; }
   Sfx.purchase();
   toast(SKILL_TREE[key].name + " amélioré !");
+  refreshCurrentPanel();
+  updateHeader();
+  saveState(Game.state);
+}
+function onBuyRunUpgrade(key) {
+  const result = buyRunUpgrade(Game.state, key);
+  if (!result.ok) { Sfx.error(); toast(result.reason === "max" ? "Niveau maximum atteint." : "Pas assez de Stardust."); return; }
+  Sfx.purchase();
+  toast(RUN_UPGRADE_TREE[key].name + " amélioré !");
   refreshCurrentPanel();
   updateHeader();
   saveState(Game.state);
@@ -679,7 +932,7 @@ async function onBonusAdQuest() {
 // site. Buttons that already play their own distinct sound synchronously on
 // click (Invoquer, Big Bang confirm) either stop propagation or are excluded
 // by id below, so this never doubles up with them.
-const SILENT_CLICK_IDS = new Set(["bigBangConfirm", "invokeChoiceStardust", "invokeChoiceGems"]);
+const SILENT_CLICK_IDS = new Set(["bigBangConfirm", "invokeBtnStardust", "invokeBtnGems"]);
 function wireClickSound() {
   document.addEventListener("click", (e) => {
     const el = e.target.closest(".btn, .drawerItem, .iconBtn, .fab, .switch, .tabBtn");
@@ -689,13 +942,24 @@ function wireClickSound() {
 }
 
 // Tapping the dark backdrop closes whichever modal is open, same as its own
-// close/cancel button - except the first-god ritual, which is a mandatory
-// one-time choice with no close button at all by design.
+// close/cancel button, by calling its close handler when it has one (it clears pending state).
+// Never closable from the backdrop:
+// - godRitualModal: mandatory choice
+// - offlineModal: only its buttons pay out the offline gain
+const MODAL_BACKDROP_LOCKED = new Set(["godRitualModal", "offlineModal"]);
 function wireModalBackdropClose() {
+  const closeHandlers = {
+    godUnlockModal: closeGodUnlockModal,
+    confirmActionModal: closeConfirmModal,
+    fusionPromoModal: closeFusionPromoModal,
+    eggFinaleModal: closeEggFinaleModal,
+  };
   document.addEventListener("click", (e) => {
-    if (e.target.classList.contains("modalOverlay") && e.target.id !== "godRitualModal") {
-      e.target.classList.add("hidden");
-    }
+    const overlay = e.target;
+    if (!overlay.classList.contains("modalOverlay") || MODAL_BACKDROP_LOCKED.has(overlay.id)) return;
+    const close = closeHandlers[overlay.id];
+    if (close) close();
+    else overlay.classList.add("hidden");
   });
 }
 
@@ -705,10 +969,8 @@ function wireEvents() {
   document.addEventListener("pointerdown", onPointerDown, { passive: false });
   document.addEventListener("touchstart", onPointerDown, { passive: false });
 
-  dom.invokeBtn.addEventListener("click", () => { ensureAudio(); openInvokeChoiceModal(); });
-  $("invokeChoiceStardust").addEventListener("click", () => { doInvoke(); closeInvokeChoiceModal(); });
-  $("invokeChoiceGems").addEventListener("click", () => { doInvokeWithGems(); closeInvokeChoiceModal(); });
-  $("invokeChoiceClose").addEventListener("click", closeInvokeChoiceModal);
+  dom.invokeBtnStardust.addEventListener("click", () => { ensureAudio(); doInvoke(); });
+  dom.invokeBtnGems.addEventListener("click", () => { ensureAudio(); doInvokeWithGems(); });
   dom.bigBangBtn.addEventListener("click", () => openBigBangModal());
   dom.menuBtn.addEventListener("click", () => openDrawer());
   dom.drawerClose.addEventListener("click", closeDrawer);
@@ -720,18 +982,33 @@ function wireEvents() {
   dom.panelClose.addEventListener("click", closePanel);
 
   $("fabShop").addEventListener("click", () => openPanel("shop"));
+  $("fabRunUpgrades").addEventListener("click", () => openPanel("runUpgrades"));
   dom.fabDailyLogin.addEventListener("click", openDailyModal);
   dom.fabWheel.addEventListener("click", openWheelModal);
-  dom.fabFreePlanet.addEventListener("click", onFreePlanet);
-  $("fabBoost").addEventListener("click", onWatchProdBoostAd);
+  $("fabAutoClicker").addEventListener("click", onAutoClickerClick);
+  $("autoClickerIntroPick").addEventListener("click", () => {
+    $("autoClickerIntroModal").classList.add("hidden");
+    // Through onAutoClickerClick: today's free use may already be spent from the Boutique.
+    onAutoClickerClick();
+  });
   $("fabUnlockCellAd").addEventListener("click", onUnlockCellAd);
+  dom.fabSwapCells.addEventListener("click", onSwapCellsClick);
   $("fabCurrentGod").addEventListener("click", () => openPanel("gods"));
   $("fabRestart").addEventListener("click", openRestartModal);
   $("fabGemsAd").addEventListener("click", onWatchGemsAd);
   $("fabSkins").addEventListener("click", openSkinManagerModal);
   $("skinManagerClose").addEventListener("click", closeSkinManagerModal);
+  $("skinPreviewClose").addEventListener("click", closeSkinPreviewModal);
   $("cosmicBoxClose").addEventListener("click", closeCosmicBoxModal);
   $("purchaseConfirmClose").addEventListener("click", closePurchaseConfirmModal);
+
+  $("fabSecrets").addEventListener("click", openSecretsModal);
+  $("secretsClose").addEventListener("click", closeSecretsModal);
+  $("eggFoundClose").addEventListener("click", closeEggFoundModal);
+  $("eggFinaleClose").addEventListener("click", closeEggFinaleModal);
+  $("godUnlockClose").addEventListener("click", closeGodUnlockModal);
+  $("godUnlockEquip").addEventListener("click", onEquipGodFromUnlockModal);
+  $("vipGemsClose").addEventListener("click", closeVipGemsModal);
 
   dom.energyPill.addEventListener("click", () => openPanel("skills"));
   $("gemsPill").addEventListener("click", openGemsMenuModal);
@@ -759,14 +1036,37 @@ function wireEvents() {
   $("restartCancel").addEventListener("click", closeRestartModal);
   $("restartConfirm").addEventListener("click", onRestartConfirm);
 
+  $("confirmActionCancel").addEventListener("click", closeConfirmModal);
+  $("confirmActionConfirm").addEventListener("click", onConfirmActionConfirm);
+
   $("saveCodeCancel").addEventListener("click", closeSaveCodeModal);
   $("saveCodeAction").addEventListener("click", onSaveCodeAction);
 
   $("bbSummaryClose").addEventListener("click", closeBigBangSummaryModal);
 
   $("removeAdsPromptLater").addEventListener("click", closeRemoveAdsPromptModal);
-  $("removeAdsPromptBuy").addEventListener("click", async () => {
+  $("removeAdsPromptBuy").addEventListener("click", () => {
     closeRemoveAdsPromptModal();
-    await onBuyIAP("remove_ads");
+    const product = IAP_CATALOG.find(p => p.id === "remove_ads");
+    openConfirmModal({
+      title: product.name,
+      text: `${product.desc} — ${product.price}`,
+      confirmLabel: "Acheter",
+      onConfirm: () => onBuyIAP("remove_ads"),
+    });
+  });
+
+  $("fusionPromoLater").addEventListener("click", closeFusionPromoModal);
+  $("fusionPromoBuy").addEventListener("click", () => {
+    const id = fusionPromoProductId;
+    closeFusionPromoModal();
+    const product = id && IAP_CATALOG.find(p => p.id === id);
+    if (!product) return;
+    openConfirmModal({
+      title: product.name,
+      text: `${product.desc || ""} — ${product.price}`,
+      confirmLabel: product.type === "subscription" ? "S'abonner" : "Acheter",
+      onConfirm: () => onBuyIAP(id),
+    });
   });
 }

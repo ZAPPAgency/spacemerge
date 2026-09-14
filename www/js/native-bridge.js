@@ -2,9 +2,7 @@
 //
 // This file is the ONLY module-type script in index.html; every other game
 // file stays plain <script> (global functions, zero build step) so the web
-// prototype keeps working unmodified in any browser. This bridge is a no-op
-// when Capacitor isn't present (window.Capacitor undefined), so including it
-// in the plain web build is harmless.
+// build keeps working unmodified in any browser. Without Capacitor, nothing below runs.
 //
 // It replaces the web stubs (services.js: AdService/IAPService, audio.js:
 // HapticService, state.js: saveState/loadState) with real native-backed
@@ -26,7 +24,8 @@ import { Purchases, LOG_LEVEL } from "@revenuecat/purchases-capacitor";
 import { GameConnect } from "@openforge/capacitor-game-connect";
 
 if (!Capacitor || !Capacitor.isNativePlatform || !Capacitor.isNativePlatform()) {
-  // Running in a plain browser (web prototype / Artifact preview) - do nothing.
+  // Plain browser. The bare imports above only resolve in the Vite build, so the web
+  // build logs one expected, harmless console error here.
 } else {
   bootNative();
 }
@@ -61,7 +60,7 @@ async function bootNative() {
       // A previous native save exists and differs from the localStorage bootstrap
       // (e.g. first run after this bridge was added) - prefer it.
       const migrated = JSON.parse(value);
-      if (migrated && migrated.version === SAVE_VERSION) Object.assign(Game.state, migrated);
+      if (migrated && migrated.version === SAVE_VERSION) Object.assign(Game.state, migrateRetiredFields(migrated));
     }
   } catch (e) { console.warn("Lecture Preferences impossible", e); }
 

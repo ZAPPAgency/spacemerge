@@ -31,6 +31,48 @@ function trackFusionEvent(state, newTier) {
   updateQuestProgress(state, "reachTier", newTier, true);
   checkAchievements(state);
   onFusionForGods(state, newTier); // moon-merge ritual, Erebus streak, Morgorath challenge - see gods.js (checks some achievements, so must run after checkAchievements above)
+  const promo = checkFusionPromo(state);
+  if (promo) Game.pendingPromo = promo; // shown by maybeOpenFusionPromo() (input.js)
+}
+
+// Minimum real time between two promo popups, on top of each promo's own gate.
+const PROMO_MIN_GAP_MS = 3 * 60 * 1000;
+const FUSIONS_BEFORE_REMOVE_ADS_PROMO = 70;
+function promoGapElapsed(state) {
+  return Date.now() - (state.lastPromoShownAt || 0) >= PROMO_MIN_GAP_MS;
+}
+function markPromoShown(state) { state.lastPromoShownAt = Date.now(); }
+
+// ---- IAP promos on fusion milestones ----
+// Shown well after the last fab reveal (FAB_DISCOVERY_FUSIONS, ui.js).
+function checkFusionPromo(state) {
+  // `>=` rather than `===`: the gap check can delay a promo past its milestone.
+  // promptsShown guarantees each promo fires once.
+  if (state.lifetime.fusions >= 40 && !state.promptsShown.starterPack && !isOneTimeIapOwned(state, "starter_pack")
+    && daysBetween(state.firstPlayedDay, todayStr()) <= 2 && promoGapElapsed(state)) {
+    state.promptsShown.starterPack = true;
+    markPromoShown(state);
+    return "starterPack";
+  }
+  if (state.lifetime.fusions >= 130 && !state.promptsShown.vipPass && !isVipActive(state) && promoGapElapsed(state)) {
+    state.promptsShown.vipPass = true;
+    markPromoShown(state);
+    return "vipPass";
+  }
+  return null;
+}
+
+// Offline auto-clicker: grantTapBonus pays 5x the tile's production every TAP_COOLDOWN_MS.
+// Limited to the time left on the clicker when the app closed, and to the offline cap.
+function autoClickerOfflineGain(state, cappedMs) {
+  const ac = state.autoClicker;
+  if (!ac || ac.targetIdx === null) return 0;
+  const activeMsAtClose = ac.activeUntil - state.lastSaveTime;
+  if (activeMsAtClose <= 0) return 0; // expired before the app closed
+  const activeMs = Math.min(cappedMs, activeMsAtClose);
+  const tile = state.grid[ac.targetIdx];
+  if (!tile) return 0; // empty target: paused, like online
+  return 5 * effectiveTileProd(state, tile) * (activeMs / TAP_COOLDOWN_MS);
 }
 
 // ---- Offline gains ----
@@ -39,7 +81,7 @@ function computeOfflineGain(state, nowTs) {
   const capMs = offlineCapHours(state) * 3600 * 1000;
   const cappedMs = Math.min(elapsedMs, capMs);
   const prod = totalProduction(state);
-  const gain = prod * (cappedMs / 1000) * 0.5;
+  const gain = prod * (cappedMs / 1000) * 0.5 + autoClickerOfflineGain(state, cappedMs);
   return { elapsedMs, cappedMs, gain, wasCapped: elapsedMs > capMs };
 }
 
@@ -71,11 +113,10 @@ function applyOfflineAutoSpawns(state, cappedMs) {
 // input.js watchRewardedAd) and flags the one moment a soft paywall for
 // "Suppression des pubs" should interrupt: the very first time the count
 // reaches 5, an amount high enough to mean the player is actually engaging
-// with rewarded ads rather than a one-off. Fires exactly once since a
-// strictly-increasing counter only equals 5 on one call.
+// with rewarded ads. `>=` rather than `===`: the promo can be delayed by other gates.
 function trackRewardedAdWatched(state) {
   state.lifetime.adsWatched += 1;
-  return state.lifetime.adsWatched === 5;
+  return state.lifetime.adsWatched >= 5 && !state.promptsShown.removeAdsPrompt;
 }
 
 // ---- VIP daily Gems (Pass Supernova perk) ----
@@ -83,7 +124,10 @@ function grantVipDailyGemsIfDue(state) {
   if (!isVipActive(state)) return 0;
   if (state.iap.vipLastGemsDay === todayStr()) return 0;
   state.iap.vipLastGemsDay = todayStr();
-  return grantGems(state, VIP_DAILY_GEMS);
+  const granted = grantGems(state, VIP_DAILY_GEMS);
+  // Too early in boot/resume to open a modal: maybeOpenVipGemsModal() (ui.js) shows it.
+  Game.pendingVipGems = granted;
+  return granted;
 }
 
 // ---- Daily login ----
@@ -124,14 +168,9 @@ function applyDailyReward(state, reward) {
       if (locked.length) state.unlocked[locked[Math.floor(Math.random() * locked.length)]] = true;
       break;
     }
-    case "skinFragment": {
-      state.skinFragments += 1;
-      if (state.skinFragments >= SKIN_FRAGMENTS_REQUIRED) {
-        const next = [...AMBIANCES, ...EMOJI_SETS].find(s => s.cost > 0 && !state.ownedSkins.includes(s.id));
-        if (next) { unlockCosmeticFree(state, next.id); state.skinFragments = 0; }
-      }
+    case "streakFreeze":
+      state.dailyLogin.streakFreezeCharges += 1;
       break;
-    }
     case "bigReward":
       state.cosmicEnergy += 1;
       grantStardust(state, 500);
@@ -221,29 +260,48 @@ const WHEEL_PRIZES = [
   { type: "stardust", amount: 500, weight: 20, label: "500 ✨" },
   { type: "gems", amount: 10, weight: 20, label: "10 💎" },
   { type: "gems", amount: 25, weight: 10, label: "25 💎" },
-  { type: "skinFragment", amount: 1, weight: 10, label: "Fragment de skin" },
+  { type: "unlockCell", amount: 1, weight: 10, label: "1 case débloquée" },
   { type: "cosmicEnergy", amount: 1, weight: 5, label: "1 ⚡" },
   { type: "stardust", amount: 1500, weight: 5, label: "1500 ✨" },
 ];
+// Angular bounds of WHEEL_PRIZES[index], in degrees clockwise from 12 o'clock.
+// Shared by the wheel drawing (ui.js) and the landing spin (input.js) so they match.
+function wheelSegmentBounds(index) {
+  const total = WHEEL_PRIZES.reduce((s, p) => s + p.weight, 0);
+  let acc = 0;
+  for (let i = 0; i < index; i++) acc += WHEEL_PRIZES[i].weight;
+  const startDeg = (acc / total) * 360;
+  const endDeg = ((acc + WHEEL_PRIZES[index].weight) / total) * 360;
+  return { startDeg, endDeg };
+}
 function ensureDailySpin(state) {
   if (state.dailySpin.date !== todayStr()) {
     state.dailySpin = { date: todayStr(), freeUsed: false, bonusUsed: false };
   }
 }
-function pickWheelPrize() {
-  const total = WHEEL_PRIZES.reduce((s, p) => s + p.weight, 0);
+function ensureGemsAdStreak(state) {
+  if (state.gemsAdStreak.date !== todayStr()) {
+    state.gemsAdStreak = { date: todayStr(), count: 0 };
+  }
+}
+// "1 case débloquée" is removed from the draw when the grid is full,
+// so every prize the wheel lands on actually gives something.
+function pickWheelPrize(state) {
+  const gridFull = unlockedCount(state) >= TOTAL;
+  const pool = WHEEL_PRIZES.filter(p => !(gridFull && p.type === "unlockCell"));
+  const total = pool.reduce((s, p) => s + p.weight, 0);
   let r = Math.random() * total;
-  for (const p of WHEEL_PRIZES) { if (r < p.weight) return p; r -= p.weight; }
-  return WHEEL_PRIZES[0];
+  for (const p of pool) { if (r < p.weight) return p; r -= p.weight; }
+  return pool[0];
 }
 function spinWheel(state, isBonus) {
   ensureDailySpin(state);
   if (isBonus && state.dailySpin.bonusUsed) return null;
   if (!isBonus && state.dailySpin.freeUsed) return null;
-  const prize = pickWheelPrize();
+  const prize = pickWheelPrize(state);
   if (prize.type === "stardust") grantStardust(state, prize.amount);
   else if (prize.type === "gems") grantGems(state, prize.amount);
-  else if (prize.type === "skinFragment") applyDailyReward(state, { type: "skinFragment" });
+  else if (prize.type === "unlockCell") applyDailyReward(state, { type: "unlockCell" });
   else if (prize.type === "cosmicEnergy") state.cosmicEnergy += prize.amount;
   if (isBonus) state.dailySpin.bonusUsed = true; else state.dailySpin.freeUsed = true;
   checkAchievements(state);
