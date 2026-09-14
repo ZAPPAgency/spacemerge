@@ -59,7 +59,7 @@ UI text is French (`lang="fr"`), English localization is planned.
 **Deploy**
 - Push on `main` → GitHub Pages. Other branches / PRs get previews (`.github/workflows/`).
 - Bump the cache-buster `?v=N` on every `<script>`/`<link>` in `www/index.html` when shipping
-  `www/` changes (own commit: `chore: bump du cache-buster en v=N`).
+  `www/` changes (own commit: `chore: bump cache-buster to v=N`).
 
 **Invariants (breaking these loses player data or money)**
 - Saves: any shape change to `Game.state` needs a default in `defaultState()` AND a migration;
@@ -70,7 +70,8 @@ UI text is French (`lang="fr"`), English localization is planned.
 - Rewarded ads grant only after the SDK confirms the reward; purchases only after the store confirms.
 
 **Git**
-- Conventional prefix in English, description in French: `fix: la roue ne rafraîchissait pas la grille`.
+- Commit messages, PR titles and PR descriptions in English, with a conventional prefix:
+  `fix: wheel did not refresh the grid`.
 - One logical change per commit. Commit/push only when asked.
 
 ## 4. Code guidelines
