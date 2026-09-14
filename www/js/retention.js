@@ -72,7 +72,7 @@ function autoClickerOfflineGain(state, cappedMs) {
   const activeMs = Math.min(cappedMs, activeMsAtClose);
   const tile = state.grid[ac.targetIdx];
   if (!tile) return 0; // empty target: paused, like online
-  return 5 * effectiveTileProd(state, tile.tier) * (activeMs / TAP_COOLDOWN_MS);
+  return 5 * effectiveTileProd(state, tile) * (activeMs / TAP_COOLDOWN_MS);
 }
 
 // ---- Offline gains ----

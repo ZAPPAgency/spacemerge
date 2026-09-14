@@ -225,12 +225,18 @@ function tierGodMultiplier(state, tier) {
   const bonus = getGodEffects(state).tierProdBonus;
   return (bonus && tier >= bonus.minTier && tier <= bonus.maxTier) ? bonus.mult : 1;
 }
-function effectiveTileProd(state, tier) { return tierProd(tier) * tierGodMultiplier(state, tier) * productionMultiplier(state); }
+// Production keeps doubling past Genèse: a cycle-1 tier-1 tile counts as tier 15 (tileProgressTier),
+// so merging two Genèse never lowers income. God tier bonuses only cover base tiers.
+function tileBaseProd(state, tile) {
+  const progress = tileProgressTier(tile);
+  return tierProd(progress) * tierGodMultiplier(state, progress);
+}
+function effectiveTileProd(state, tile) { return tileBaseProd(state, tile) * productionMultiplier(state); }
 function totalProduction(state) {
   let p = 0;
   for (let i = 0; i < TOTAL; i++) {
     const t = state.grid[i];
-    if (t) p += tierProd(t.tier) * tierGodMultiplier(state, t.tier);
+    if (t) p += tileBaseProd(state, t);
   }
   return p * productionMultiplier(state);
 }
