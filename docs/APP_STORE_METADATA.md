@@ -1,10 +1,10 @@
-# Godspark — Métadonnées App Store Connect
+# Spacemerge — Métadonnées App Store Connect
 
 ## 🇫🇷 Français
 
 **Nom** (≤30 car.)
 ```
-Godspark
+Spacemerge
 ```
 
 **Sous-titre** (≤30 car. — actuel : 23)
@@ -38,7 +38,7 @@ puissante.
 ★ PERSONNALISEZ — ambiances et sets d'icônes à combiner comme tu veux pour
   ta grille
 
-Godspark se joue à ton rythme : quelques secondes pour fusionner et
+Spacemerge se joue à ton rythme : quelques secondes pour fusionner et
 récupérer tes gains, ou de longues sessions pour optimiser ta grille et
 ton arbre de compétences. Connexion quotidienne, quêtes et succès te
 récompensent chaque jour.
@@ -57,7 +57,7 @@ fusion,merge,idle,incremental,spatial,dieux,mythologie,planetes,etoiles,clicker,
 
 **Notes de version (V1.0)**
 ```
-Version 1.0 — Lancement de Godspark ! Fusionne, réveille les Dieux,
+Version 1.0 — Lancement de Spacemerge ! Fusionne, réveille les Dieux,
 provoque ton premier Big Bang. Merci de nous rejoindre dès le premier
 jour de la Rupture.
 ```
@@ -71,7 +71,7 @@ jour de la Rupture.
 
 **Name** (≤30 chars)
 ```
-Godspark
+Spacemerge
 ```
 
 **Subtitle** (≤30 chars — current: 24)
@@ -103,7 +103,7 @@ makes every run faster and stronger.
 ★ PROGRESS — permanent skill tree, achievements, daily quests
 ★ CUSTOMIZE — mix and match ambiances and icon sets for your grid
 
-Godspark plays at your pace: a few seconds to merge and collect, or
+Spacemerge plays at your pace: a few seconds to merge and collect, or
 long sessions to optimize your grid and skill tree. Daily login, quests,
 and achievements reward you every day.
 
@@ -121,7 +121,7 @@ merge,idle,incremental,clicker,space,gods,mythology,planets,stars,prestige,puzzl
 
 **Release notes (V1.0)**
 ```
-Version 1.0 — Godspark launches! Merge, awaken the Gods, trigger your
+Version 1.0 — Spacemerge launches! Merge, awaken the Gods, trigger your
 first Big Bang. Thanks for joining us on day one of the Rupture.
 ```
 

@@ -1,4 +1,4 @@
-# Godspark — Audit & Roadmap to Publication
+# Spacemerge — Audit & Roadmap to Publication
 
 **Date:** 2026-08-26
 **Scope:** full repo audit (source, config, docs) against App Store Review
@@ -732,7 +732,7 @@ game balance for everyone.
 
 # P3 — Hygiene
 
-- **`appId` is still `com.example.godspark`** (`capacitor.config.ts:5`).
+- **`appId` is still `com.example.spacemerge`** (`capacitor.config.ts:5`).
   Trivial, but it blocks `cap add ios` from being correct — do it first.
 - **Cache-busting `?v=20` is manual** on all 10 script tags
   (`index.html:324-333`). Vite hashes filenames on the native build, so this

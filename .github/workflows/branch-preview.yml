@@ -2,7 +2,7 @@ name: Deploy branch previews
 
 # Publie une preview par branche sous gh-pages/branch-preview/<slug>, pour que
 # n'importe qui puisse tester une branche sans ouvrir de PR :
-#   https://zappagency.github.io/cosmerge/branch-preview/<slug>/
+#   https://zappagency.github.io/spacemerge/branch-preview/<slug>/
 # Les previews de PR (pr-preview/pr-N) restent gérées par preview.yml.
 
 on:
@@ -60,7 +60,7 @@ jobs:
       - name: Lien de la preview
         if: steps.prep.outputs.skip == 'false'
         run: |
-          url="https://zappagency.github.io/cosmerge/branch-preview/${{ steps.prep.outputs.slug }}/"
+          url="https://zappagency.github.io/spacemerge/branch-preview/${{ steps.prep.outputs.slug }}/"
           {
             echo "### Preview de \`$GITHUB_REF_NAME\`"
             echo ""

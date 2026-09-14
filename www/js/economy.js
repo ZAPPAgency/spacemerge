@@ -1,4 +1,4 @@
-// Godspark - prestige (Big Bang), permanent skill tree, shop logic
+// Spacemerge - prestige (Big Bang), permanent skill tree, shop logic
 "use strict";
 
 // Uses a fixed tier (not the top tier) so merging past Univers keeps Big Bang available.

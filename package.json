@@ -1,8 +1,8 @@
 {
-  "name": "godspark",
+  "name": "spacemerge",
   "version": "1.0.0",
   "private": true,
-  "description": "Godspark - jeu merge/idle/prestige spatial (Capacitor iOS)",
+  "description": "Spacemerge - jeu merge/idle/prestige spatial (Capacitor iOS)",
   "scripts": {
     "build": "vite build",
     "sync": "npm run build && cap sync ios",
