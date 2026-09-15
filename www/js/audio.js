@@ -239,7 +239,8 @@ const MusicService = (function () {
     start() {
       if (running) return;
       const ctx = ensureAudio();
-      if (!ctx) return;
+      // The first ensureAudio() call starts the music itself; starting again would stack a second chord loop.
+      if (!ctx || running) return;
       if (!masterGain) {
         masterGain = ctx.createGain();
         masterGain.gain.value = MASTER_LEVEL;

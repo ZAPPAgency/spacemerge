@@ -36,8 +36,6 @@ function requestStorageAccessBestEffort() {
     swapFree: false,
     // Waiting for the player to pick the auto-clicker's target cell.
     autoClickerArmed: false,
-    // Ad already watched but no cell picked yet: reopening the picker is free.
-    autoClickerPaid: false,
     // God ids waiting for their unlock modal (maybeOpenGodRevealModal, ui.js).
     pendingGodReveals: [],
     // Merges chained within MERGE_STREAK_WINDOW_MS; raises the combo chime.

@@ -277,10 +277,11 @@ function updateHeader() {
   const swapCost = SHOP_GEM_ITEMS.find(i => i.id === "swapCells").cost;
   const swapAffordable = state.gems >= swapCost;
   const swapAdLeft = state.cooldowns.swapAdUntil - now;
-  const swapAdOnCooldown = !swapAffordable && swapAdLeft > 0;
+  const swapFreeReady = state.adRewards.freeSwap; // ad already watched, swap not done yet (onSwapCellsClick, input.js)
+  const swapAdOnCooldown = !swapAffordable && !swapFreeReady && swapAdLeft > 0;
   const swapDisabled = Game.swapArmed || swapAdOnCooldown;
   if (swapDisabled !== lastHeaderRender.swapDisabled) { dom.fabSwapCells.classList.toggle("disabled", swapDisabled); lastHeaderRender.swapDisabled = swapDisabled; }
-  const swapLabel = swapAffordable
+  const swapLabel = swapAffordable && !swapFreeReady
     ? `<img class="inlineCurrencyIcon" src="assets/ui/gems_ad.png" alt="Gems">${swapCost}`
     : (swapAdOnCooldown ? formatDuration(swapAdLeft)
       : `<img class="inlineCurrencyIcon" src="assets/ui/watch-ad.png" alt="">Gratuit`);
@@ -354,8 +355,8 @@ function updateFabs() {
   const now = Date.now();
   const ac = state.autoClicker;
   const autoClickerActive = ac.activeUntil > now;
-  // "Free" means no ad needed: today's free use, or an ad already watched (Game.autoClickerPaid).
-  const autoClickerFree = !autoClickerActive && (isAutoClickerFreeAvailable(state) || Game.autoClickerPaid);
+  // "Free" means no ad needed: today's free use, or an ad already watched (state.adRewards.autoClicker).
+  const autoClickerFree = !autoClickerActive && (isAutoClickerFreeAvailable(state) || state.adRewards.autoClicker);
   const justRevealedAutoClicker = revealFab("fabAutoClicker", fusions >= FAB_DISCOVERY_FUSIONS.fabAutoClicker);
   $("fabAutoClicker").classList.toggle("ready", autoClickerFree);
   $("fabAutoClicker").classList.toggle("active", autoClickerActive);
@@ -711,7 +712,7 @@ function renderShopPanel() {
   const ac = state.autoClicker;
   const autoClickerActive = ac.activeUntil > Date.now();
   const autoClickerFree = !autoClickerActive && isAutoClickerFreeAvailable(state);
-  const autoClickerPaid = !autoClickerActive && !autoClickerFree && Game.autoClickerPaid; // ad already watched, cell not picked yet (onAutoClickerClick, input.js)
+  const autoClickerPaid = !autoClickerActive && !autoClickerFree && state.adRewards.autoClicker; // ad already watched, cell not picked yet (onAutoClickerClick, input.js)
   const autoClickerCard = el("div", "card compact");
   autoClickerCard.innerHTML = `<div class="rowBetween"><h3><img class="inlineCurrencyIcon" src="assets/ui/boost.png" alt=""> Clicker Automatique (10 min)</h3></div>
     <p class="desc">${autoClickerActive ? `Actif encore ${formatDuration(ac.activeUntil - Date.now())}` :
