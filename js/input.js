@@ -140,6 +140,7 @@ function handleSwapTap(idx) {
   }
   const idxA = Game.swapFirstIdx, idxB = idx;
   const result = buyGemShopItem(state, "swapCells", { idxA, idxB, free: Game.swapFree });
+  if (result.ok && Game.swapFree) state.adRewards.freeSwap = false;
   Game.swapArmed = false;
   Game.swapFirstIdx = null;
   Game.swapFree = false;
@@ -657,7 +658,7 @@ function onAutoClickerClick() {
   const state = Game.state;
   if (Game.autoClickerArmed) {
     Game.autoClickerArmed = false;
-    toast(Game.autoClickerPaid ? "Sélection annulée. Ta publicité reste acquise." : "Sélection annulée.");
+    toast(state.adRewards.autoClicker ? "Sélection annulée. Ta publicité reste acquise." : "Sélection annulée.");
     renderAll();
     return;
   }
@@ -666,15 +667,16 @@ function onAutoClickerClick() {
     toast("Clicker déjà actif encore " + formatDuration(state.autoClicker.activeUntil - now));
     return;
   }
-  // Game.autoClickerPaid: the watched ad stays earned if the picker is cancelled.
-  if (isAutoClickerFreeAvailable(state) || Game.autoClickerPaid) { armAutoClickerPicker(); return; }
+  // adRewards.autoClicker: the watched ad stays earned if the picker is cancelled or the app reloads.
+  if (isAutoClickerFreeAvailable(state) || state.adRewards.autoClicker) { armAutoClickerPicker(); return; }
   confirmThenWatchAd(state, "Clicker automatique",
     "Ton clicker gratuit du jour est déjà utilisé. Regarde une publicité pour le relancer tout de suite, pour 10 minutes de plus.",
     async () => {
       if (!adsRemoved(state)) toast("📺 Chargement de la publicité...");
       const ok = await watchRewardedAd(state, "auto_clicker");
       if (!ok) return;
-      Game.autoClickerPaid = true;
+      state.adRewards.autoClicker = true;
+      saveState(state);
       armAutoClickerPicker();
     });
 }
@@ -688,7 +690,8 @@ function handleAutoClickerPick(idx) {
   const state = Game.state;
   if (!state.unlocked[idx] || !state.grid[idx]) { toast("Choisis une case débloquée avec une tuile."); Sfx.error(); return; }
   Game.autoClickerArmed = false;
-  Game.autoClickerPaid = false; // the watched ad is spent now
+  // The daily free use is spent first, so an ad reward kept from a previous day isn't wasted.
+  if (!isAutoClickerFreeAvailable(state)) state.adRewards.autoClicker = false;
   activateAutoClicker(state, idx);
   Sfx.purchase();
   toast("🤖 Clicker automatique activé pour 10 min !");
@@ -719,6 +722,15 @@ function playAutoClickEffect(idx) {
 function onSwapCellsClick() {
   const state = Game.state;
   const cost = SHOP_GEM_ITEMS.find(i => i.id === "swapCells").cost;
+  // A swap already earned with an ad but not used yet (e.g. lost to a reload) is used before any Gems.
+  if (state.adRewards.freeSwap) {
+    Game.swapArmed = true;
+    Game.swapFirstIdx = null;
+    Game.swapFree = true;
+    toast("Choisis deux cases à échanger.");
+    renderAll();
+    return;
+  }
   // Not enough Gems: offer an ad for a free swap instead.
   if (state.gems < cost) {
     if (Date.now() < state.cooldowns.swapAdUntil) {
@@ -732,6 +744,7 @@ function onSwapCellsClick() {
         const ok = await watchRewardedAd(state, "swap_cells_free");
         if (!ok) return;
         state.cooldowns.swapAdUntil = Date.now() + SWAP_AD_COOLDOWN_MS;
+        state.adRewards.freeSwap = true;
         Game.swapArmed = true;
         Game.swapFree = true;
         toast("Choisis deux cases à échanger.");
