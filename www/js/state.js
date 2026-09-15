@@ -108,6 +108,9 @@ function defaultState() {
     moonMergesThisRun: 0, // toward MOON_MERGES_TO_CHOOSE_GOD (first-god ritual)
 
     cooldowns: { unlockCellAdUntil: 0, swapAdUntil: 0, gemsAdUntil: 0 },
+    // Rewards from a watched ad that haven't been used yet. Persisted because the OS
+    // often reloads the WebView after a native ad, and the ad cooldown is already saved.
+    adRewards: { freeSwap: false, autoClicker: false },
     dailySpin: { date: null, freeUsed: false, bonusUsed: false },
     // Free daily Gems claim (grantGemsFree, economy.js). `date` uses todayStr().
     gemsAdFree: { date: null, used: false },
@@ -155,7 +158,7 @@ function loadState() {
     if (data.version !== SAVE_VERSION) return defaultState();
     // fill any missing fields added by later updates (defensive against partial saves)
     const fresh = defaultState();
-    return migrateRetiredFields(deepFill(data, fresh));
+    return deepFill(migrateRetiredFields(data), fresh);
   } catch (e) {
     console.warn("Save corrompue, nouvelle partie.", e);
     return defaultState();
@@ -163,8 +166,16 @@ function loadState() {
 }
 
 // deepFill() only adds fields. This converts fields no longer read into their
-// current equivalent. Must run on every load path, including native-bridge.js.
+// current equivalent. Must run on every load path, including importSaveCode() and native-bridge.js.
+// Runs on the raw save, before deepFill(), so it can tell a missing field from a default one.
 function migrateRetiredFields(state) {
+  // Older saves showed the "remove ads" prompt when adsWatched hit exactly 5, with no flag.
+  // Past 5, that prompt either already showed or was skipped for good: don't show it again.
+  const prompts = state.promptsShown;
+  if ((!prompts || prompts.removeAdsPrompt === undefined) && state.lifetime && state.lifetime.adsWatched >= 5) {
+    state.promptsShown = Object.assign({}, prompts, { removeAdsPrompt: true });
+  }
+
   // gods.nextGodId: retired queue for a god applied at the next Big Bang.
   // Apply the queued god now instead of losing it.
   const gods = state.gods;
@@ -206,7 +217,7 @@ function importSaveCode(code) {
     const data = JSON.parse(json);
     if (!data || typeof data.version !== "number") return null;
     if (data.version === 1) return migrateFromV1(data);
-    return deepFill(data, defaultState());
+    return deepFill(migrateRetiredFields(data), defaultState());
   } catch (e) {
     return null;
   }
