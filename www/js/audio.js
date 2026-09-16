@@ -156,6 +156,12 @@ const Sfx = {
   unlock() { beep(880, 0.25, "sine", 0.07); },
   purchase() { chime([520, 780, 1040], 70, "sine", 0.06); },
   bigBang() { chime([80, 160, 320, 640, 960], 90, "sawtooth", 0.09); },
+  // Low blast layered under bigBang() by playBigBangAnimation() (ui.js): the shake
+  // reads as much more powerful with something rumbling under it.
+  bigBangBlast() {
+    noiseBurst(0.75, "lowpass", 900, 55, 0.16);
+    sweep(150, 30, 0.85, "sawtooth", 0.1);
+  },
   chest() { chime([440, 660, 880], 90, "triangle", 0.07); },
   // Wheel peg tick, called by scheduleWheelTicks (input.js). Pitch jitter avoids a machine-gun effect.
   wheelTick() { beep(880 + Math.random() * 220, 0.035, "square", 0.045); },
