@@ -7,7 +7,8 @@ function todayStr(d) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 function daysBetween(a, b) {
-  const da = new Date(a + "T00:00:00"), db = new Date(b + "T00:00:00");
+  const da = new Date(a + "T00:00:00"),
+    db = new Date(b + "T00:00:00");
   return Math.round((db - da) / 86400000);
 }
 
@@ -18,25 +19,35 @@ function daysBetween(a, b) {
 // ensureDailyQuests fires every frame via updateQuestNotifDot, so the date
 // check is never stale for more than a fraction of a second past midnight).
 function pickDailyQuests(excludeIds) {
-  const pool = QUEST_POOL.filter(q => !excludeIds || !excludeIds.includes(q.id));
+  const pool = QUEST_POOL.filter(
+    (q) => !excludeIds || !excludeIds.includes(q.id),
+  );
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
-  return pool.slice(0, 3).map(q => ({ id: q.id, progress: 0, done: false, claimed: false }));
+  return pool
+    .slice(0, 3)
+    .map((q) => ({ id: q.id, progress: 0, done: false, claimed: false }));
 }
 
 function freshGrid(state) {
   const unlocked = new Array(TOTAL).fill(false);
   const godEffects = getGodEffects(state);
-  const extra = state.skills.swarm + Math.round(godEffects.extraStartCells || 0);
+  const extra =
+    state.skills.swarm + Math.round(godEffects.extraStartCells || 0);
   const startCells = INITIAL_UNLOCKED.slice();
   // additional starting cells from the Swarm skill: nearest locked neighbours of the initial block
   if (extra > 0) {
-    const candidates = [6, 12, 18, 19, 20, 5, 4, 3, 2, 1, 0, 23, 24, 25, 26, 27, 28, 29];
-    for (let i = 0; i < extra && i < candidates.length; i++) startCells.push(candidates[i]);
+    const candidates = [
+      6, 12, 18, 19, 20, 5, 4, 3, 2, 1, 0, 23, 24, 25, 26, 27, 28, 29,
+    ];
+    for (let i = 0; i < extra && i < candidates.length; i++)
+      startCells.push(candidates[i]);
   }
-  startCells.forEach(i => { unlocked[i] = true; });
+  startCells.forEach((i) => {
+    unlocked[i] = true;
+  });
   const grid = new Array(TOTAL).fill(null);
   grid[8] = { tier: 1 };
   grid[9] = { tier: 1 };
@@ -81,7 +92,11 @@ function defaultState() {
     iconStyle: "illustrated", // "illustrated" | "emoji"
 
     // One-time promo popups (checkFusionPromo, retention.js): each fires at most once.
-    promptsShown: { starterPack: false, vipPass: false, removeAdsPrompt: false },
+    promptsShown: {
+      starterPack: false,
+      vipPass: false,
+      removeAdsPrompt: false,
+    },
     // "Don't ask again" checkboxes of confirm modals, keyed by dontAskKey.
     dontAskAgain: {},
     // Secret easter egg ids (EASTER_EGGS). The counter stays hidden until the first one.
@@ -89,9 +104,18 @@ function defaultState() {
     // Minimum real time between two promo popups (PROMO_MIN_GAP_MS, retention.js).
     lastPromoShownAt: 0,
 
-    dailyLogin: { lastClaimDay: null, streak: 0, cycleDay: 1, streakFreezeCharges: 0 },
+    dailyLogin: {
+      lastClaimDay: null,
+      streak: 0,
+      cycleDay: 1,
+      streakFreezeCharges: 0,
+    },
 
-    quests: { date: null, active: [], bonusAd: { done: false, claimed: false } },
+    quests: {
+      date: null,
+      active: [],
+      bonusAd: { done: false, claimed: false },
+    },
     questsCompletedTotal: 0,
 
     achievements: { unlockedIds: [] },
@@ -99,7 +123,7 @@ function defaultState() {
     gods: {
       unlockedIds: [],
       currentGodId: null,
-      erebusStreak: 0,             // fusions since the last manual tap bonus (Erebus challenge)
+      erebusStreak: 0, // fusions since the last manual tap bonus (Erebus challenge)
       usedShortcutThisRun: false, // Morgorath challenge requires never using a gem-shop grid shortcut (Sauter une case / Échanger deux cases)
       morgorathChallengeCleared: false,
       usageCount: {}, // { godId: number of Big Bangs completed with that god equipped } - informational only
@@ -120,10 +144,22 @@ function defaultState() {
     // targetIdx: cell auto-tapped; kept when the cell empties so it resumes on refill.
     // activeUntil <= now means inactive. freeUsedDate: one free use per day.
     // tutorialShown: the intro modal plays only once, ever.
-    autoClicker: { targetIdx: null, activeUntil: 0, freeUsedDate: null, tutorialShown: false },
+    autoClicker: {
+      targetIdx: null,
+      activeUntil: 0,
+      freeUsedDate: null,
+      tutorialShown: false,
+    },
 
     // starterPack: one-time purchase, so the shop and promo don't offer it again.
-    iap: { removeAds: false, vipUntil: 0, ownedSkinPacks: [], stardustBoost: false, starterPack: false, vipLastGemsDay: null },
+    iap: {
+      removeAds: false,
+      vipUntil: 0,
+      ownedSkinPacks: [],
+      stardustBoost: false,
+      starterPack: false,
+      vipLastGemsDay: null,
+    },
 
     settings: { sound: true, music: true, notifications: true },
     firstPlayedDay: todayStr(),
@@ -172,7 +208,11 @@ function migrateRetiredFields(state) {
   // Older saves showed the "remove ads" prompt when adsWatched hit exactly 5, with no flag.
   // Past 5, that prompt either already showed or was skipped for good: don't show it again.
   const prompts = state.promptsShown;
-  if ((!prompts || prompts.removeAdsPrompt === undefined) && state.lifetime && state.lifetime.adsWatched >= 5) {
+  if (
+    (!prompts || prompts.removeAdsPrompt === undefined) &&
+    state.lifetime &&
+    state.lifetime.adsWatched >= 5
+  ) {
     state.promptsShown = Object.assign({}, prompts, { removeAdsPrompt: true });
   }
 
@@ -180,7 +220,8 @@ function migrateRetiredFields(state) {
   // Apply the queued god now instead of losing it.
   const gods = state.gods;
   if (gods && gods.nextGodId !== undefined) {
-    if (gods.nextGodId && gods.unlockedIds.includes(gods.nextGodId)) gods.currentGodId = gods.nextGodId;
+    if (gods.nextGodId && gods.unlockedIds.includes(gods.nextGodId))
+      gods.currentGodId = gods.nextGodId;
     delete gods.nextGodId;
   }
   return state;
@@ -189,7 +230,12 @@ function migrateRetiredFields(state) {
 function deepFill(data, fresh) {
   for (const k in fresh) {
     if (data[k] === undefined) data[k] = fresh[k];
-    else if (fresh[k] && typeof fresh[k] === "object" && !Array.isArray(fresh[k]) && typeof data[k] === "object") {
+    else if (
+      fresh[k] &&
+      typeof fresh[k] === "object" &&
+      !Array.isArray(fresh[k]) &&
+      typeof data[k] === "object"
+    ) {
       data[k] = deepFill(data[k], fresh[k]);
     }
   }
@@ -234,7 +280,9 @@ function productionMultiplier(state) {
 }
 function tierGodMultiplier(state, tier) {
   const bonus = getGodEffects(state).tierProdBonus;
-  return (bonus && tier >= bonus.minTier && tier <= bonus.maxTier) ? bonus.mult : 1;
+  return bonus && tier >= bonus.minTier && tier <= bonus.maxTier
+    ? bonus.mult
+    : 1;
 }
 // Production keeps doubling past Genèse: a cycle-1 tier-1 tile counts as tier 15 (tileProgressTier),
 // so merging two Genèse never lowers income. God tier bonuses only cover base tiers.
@@ -242,7 +290,9 @@ function tileBaseProd(state, tile) {
   const progress = tileProgressTier(tile);
   return tierProd(progress) * tierGodMultiplier(state, progress);
 }
-function effectiveTileProd(state, tile) { return tileBaseProd(state, tile) * productionMultiplier(state); }
+function effectiveTileProd(state, tile) {
+  return tileBaseProd(state, tile) * productionMultiplier(state);
+}
 function totalProduction(state) {
   let p = 0;
   for (let i = 0; i < TOTAL; i++) {
@@ -260,32 +310,66 @@ function autoClickerProduction(state) {
   if (ac.targetIdx === null || ac.activeUntil <= Date.now()) return 0;
   const tile = state.grid[ac.targetIdx];
   if (!tile) return 0; // empty target: paused, like tickAutoClicker
-  return TAP_BONUS_PROD_SECONDS * effectiveTileProd(state, tile) * (1000 / TAP_COOLDOWN_MS);
+  return (
+    TAP_BONUS_PROD_SECONDS *
+    effectiveTileProd(state, tile) *
+    (1000 / TAP_COOLDOWN_MS)
+  );
+}
+// Stardust the player's own taps are currently bringing in: what grantTapBonus (input.js)
+// paid over the last MANUAL_TAP_RATE_WINDOW_MS, averaged over that window. Also prunes
+// Game.recentTaps, which only this function reads.
+function manualTapProduction() {
+  const taps = Game.recentTaps;
+  const cutoff = Date.now() - MANUAL_TAP_RATE_WINDOW_MS;
+  while (taps.length > 0 && taps[0].at <= cutoff) taps.shift();
+  let sum = 0;
+  for (const tap of taps) sum += tap.amount;
+  return sum / (MANUAL_TAP_RATE_WINDOW_MS / 1000);
 }
 // Rate shown to the player: everything Stardust is currently coming in at.
-function displayedProduction(state) { return totalProduction(state) + autoClickerProduction(state); }
+function displayedProduction(state) {
+  return (
+    totalProduction(state) +
+    autoClickerProduction(state) +
+    manualTapProduction()
+  );
+}
 
-function isVipActive(state) { return state.iap.vipUntil > Date.now(); }
-function adsRemoved(state) { return state.iap.removeAds || isVipActive(state); }
+function isVipActive(state) {
+  return state.iap.vipUntil > Date.now();
+}
+function adsRemoved(state) {
+  return state.iap.removeAds || isVipActive(state);
+}
 // Owned one-time purchases are hidden from the shop and promos.
 // Consumables and the subscription always return false.
 function isOneTimeIapOwned(state, productId) {
   switch (productId) {
-    case "remove_ads": return state.iap.removeAds;
-    case "stardust_boost": return state.iap.stardustBoost;
-    case "starter_pack": return state.iap.starterPack;
-    default: return false;
+    case "remove_ads":
+      return state.iap.removeAds;
+    case "stardust_boost":
+      return state.iap.stardustBoost;
+    case "starter_pack":
+      return state.iap.starterPack;
+    default:
+      return false;
   }
 }
 // VIP's "débloque tous les skins" perk is a subscription benefit, not a
 // permanent grant - it must stop working the moment vipUntil lapses, so it's
 // checked here rather than pushed into ownedSkins (which never expires).
-function isSkinOwned(state, skinId) { return state.ownedSkins.includes(skinId) || isVipActive(state); }
+function isSkinOwned(state, skinId) {
+  return state.ownedSkins.includes(skinId) || isVipActive(state);
+}
 
 // ---- Daily stats (Stardust info popup's "aujourd'hui" figure) ----
 function ensureDailyStats(state) {
   if (state.dailyStats.date !== todayStr()) {
-    state.dailyStats = { date: todayStr(), stardustAtDayStart: state.lifetime.stardustEarned };
+    state.dailyStats = {
+      date: todayStr(),
+      stardustAtDayStart: state.lifetime.stardustEarned,
+    };
   }
 }
 
@@ -300,13 +384,22 @@ function autoSpawnIntervalMs(state) {
   const reduction = Math.min(state.skills.gravity * 0.05, 0.4);
   const godMult = getGodEffects(state).spawnSpeedMult || 1;
   // Separate from `reduction`'s cap. MIN_AUTO_SPAWN_MS stays the floor.
-  const runUpgradeMult = Math.max(0.4, 1 - (state.runUpgrades.cadence || 0) * 0.04);
-  return Math.max(MIN_AUTO_SPAWN_MS, BASE_AUTO_SPAWN_MS * (1 - reduction) * godMult * runUpgradeMult);
+  const runUpgradeMult = Math.max(
+    0.4,
+    1 - (state.runUpgrades.cadence || 0) * 0.04,
+  );
+  return Math.max(
+    MIN_AUTO_SPAWN_MS,
+    BASE_AUTO_SPAWN_MS * (1 - reduction) * godMult * runUpgradeMult,
+  );
 }
 
 function emptyUnlockedIndices(state) {
   const out = [];
-  for (let i = 0; i < TOTAL; i++) if (state.unlocked[i] && !state.grid[i]) out.push(i);
+  for (let i = 0; i < TOTAL; i++)
+    if (state.unlocked[i] && !state.grid[i]) out.push(i);
   return out;
 }
-function unlockedCount(state) { return state.unlocked.reduce((a, b) => a + (b ? 1 : 0), 0); }
+function unlockedCount(state) {
+  return state.unlocked.reduce((a, b) => a + (b ? 1 : 0), 0);
+}

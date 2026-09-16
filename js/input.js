@@ -2,8 +2,10 @@
 "use strict";
 
 function localPos(e) {
-  if (e.touches && e.touches[0]) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
-  if (e.changedTouches && e.changedTouches[0]) return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+  if (e.touches && e.touches[0])
+    return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  if (e.changedTouches && e.changedTouches[0])
+    return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
   return { x: e.clientX, y: e.clientY };
 }
 function cellIdxAtPoint(x, y) {
@@ -18,7 +20,8 @@ function createGhost(tier, x, y) {
   g.className = "ghostTile";
   g.style.cssText += tierStyle(tier);
   g.appendChild(tierIconNode(tier));
-  g.style.left = x + "px"; g.style.top = y + "px";
+  g.style.left = x + "px";
+  g.style.top = y + "px";
   document.body.appendChild(g);
   return g;
 }
@@ -32,7 +35,11 @@ let pointerWatchdog = null;
 // - clean up on pointercancel/touchcancel
 // - a watchdog timeout cancels a gesture that never ends
 function onPointerDown(e) {
-  if (!dom.panelOverlay.classList.contains("hidden") || !dom.drawerOverlay.classList.contains("hidden")) return;
+  if (
+    !dom.panelOverlay.classList.contains("hidden") ||
+    !dom.drawerOverlay.classList.contains("hidden")
+  )
+    return;
   if (pointerState) return; // gesture already tracked, see note above
   const pos = localPos(e);
   const idx = cellIdxAtPoint(pos.x, pos.y);
@@ -46,7 +53,13 @@ function onPointerDown(e) {
     return;
   }
 
-  pointerState = { idx, startX: pos.x, startY: pos.y, dragging: false, ghostEl: null };
+  pointerState = {
+    idx,
+    startX: pos.x,
+    startY: pos.y,
+    dragging: false,
+    ghostEl: null,
+  };
   window.addEventListener("pointermove", onPointerMove);
   window.addEventListener("pointerup", onPointerUp);
   window.addEventListener("pointercancel", onPointerCancel);
@@ -54,7 +67,9 @@ function onPointerDown(e) {
   window.addEventListener("touchend", onPointerUp);
   window.addEventListener("touchcancel", onPointerCancel);
   clearTimeout(pointerWatchdog);
-  pointerWatchdog = setTimeout(() => { if (pointerState) onPointerCancel(); }, 6000);
+  pointerWatchdog = setTimeout(() => {
+    if (pointerState) onPointerCancel();
+  }, 6000);
 }
 
 function endPointerListeners() {
@@ -80,7 +95,8 @@ function onPointerCancel() {
 function onPointerMove(e) {
   if (!pointerState) return;
   const pos = localPos(e);
-  const dx = pos.x - pointerState.startX, dy = pos.y - pointerState.startY;
+  const dx = pos.x - pointerState.startX,
+    dy = pos.y - pointerState.startY;
   if (!pointerState.dragging && Math.hypot(dx, dy) > DRAG_THRESHOLD) {
     if (Game.swapArmed || Game.autoClickerArmed) return; // tap-only modes
     const tileData = Game.state.grid[pointerState.idx];
@@ -108,7 +124,13 @@ function onPointerUp(e) {
 
   if (dragging) {
     const targetIdx = cellIdxAtPoint(pos.x, pos.y);
-    if (targetIdx !== null && targetIdx !== idx && Game.state.unlocked[targetIdx] && Game.state.grid[targetIdx] && areAdjacent(idx, targetIdx)) {
+    if (
+      targetIdx !== null &&
+      targetIdx !== idx &&
+      Game.state.unlocked[targetIdx] &&
+      Game.state.grid[targetIdx] &&
+      areAdjacent(idx, targetIdx)
+    ) {
       attemptMerge(idx, targetIdx);
     } else {
       renderCell(idx);
@@ -125,7 +147,11 @@ function onPointerUp(e) {
 // again cancels the pick rather than charging for a no-op swap with itself.
 function handleSwapTap(idx) {
   const state = Game.state;
-  if (!state.unlocked[idx]) { toast("Choisis deux cases débloquées."); Sfx.error(); return; }
+  if (!state.unlocked[idx]) {
+    toast("Choisis deux cases débloquées.");
+    Sfx.error();
+    return;
+  }
   if (Game.swapFirstIdx === null) {
     Game.swapFirstIdx = idx;
     selectCell(idx);
@@ -138,22 +164,40 @@ function handleSwapTap(idx) {
     toast("Sélection annulée. Choisis une case à échanger.");
     return;
   }
-  const idxA = Game.swapFirstIdx, idxB = idx;
-  const result = buyGemShopItem(state, "swapCells", { idxA, idxB, free: Game.swapFree });
+  const idxA = Game.swapFirstIdx,
+    idxB = idx;
+  const result = buyGemShopItem(state, "swapCells", {
+    idxA,
+    idxB,
+    free: Game.swapFree,
+  });
   if (result.ok && Game.swapFree) state.adRewards.freeSwap = false;
   Game.swapArmed = false;
   Game.swapFirstIdx = null;
   Game.swapFree = false;
   clearSelection();
-  if (result.ok) { Sfx.purchase(); toast("Cases échangées !"); }
-  else { Sfx.error(); toast(result.reason === "funds" ? "Pas assez de Gems." : "Échange impossible."); }
+  if (result.ok) {
+    Sfx.purchase();
+    toast("Cases échangées !");
+  } else {
+    Sfx.error();
+    toast(
+      result.reason === "funds" ? "Pas assez de Gems." : "Échange impossible.",
+    );
+  }
   renderAll();
   saveState(state);
 }
 
 function handleTap(idx) {
-  if (Game.swapArmed) { handleSwapTap(idx); return; }
-  if (Game.autoClickerArmed) { handleAutoClickerPick(idx); return; }
+  if (Game.swapArmed) {
+    handleSwapTap(idx);
+    return;
+  }
+  if (Game.autoClickerArmed) {
+    handleAutoClickerPick(idx);
+    return;
+  }
   const state = Game.state;
   const tileHere = state.grid[idx];
 
@@ -163,19 +207,39 @@ function handleTap(idx) {
     return;
   }
   // Empty cell: tap selects/deselects it as the next invocation's target.
-  if (Game.selectedIdx === idx) { clearSelection(); return; }
+  if (Game.selectedIdx === idx) {
+    clearSelection();
+    return;
+  }
   selectCell(idx);
 }
 
 function handleLockedTap(idx) {
   const state = Game.state;
-  if (Game.swapArmed) { toast("Choisis deux cases débloquées pour l'échange."); Sfx.error(); return; }
-  if (Game.autoClickerArmed) { toast("Choisis une case débloquée avec une tuile."); Sfx.error(); return; }
+  if (Game.swapArmed) {
+    toast("Choisis deux cases débloquées pour l'échange.");
+    Sfx.error();
+    return;
+  }
+  if (Game.autoClickerArmed) {
+    toast("Choisis une case débloquée avec une tuile.");
+    Sfx.error();
+    return;
+  }
   if (Game.skipCellArmed) {
     const result = buyGemShopItem(state, "skipCell", { cellIndex: idx });
     Game.skipCellArmed = false;
-    if (result.ok) { Sfx.unlock(); toast("Case débloquée avec des Gems !"); }
-    else { Sfx.error(); toast(result.reason === "funds" ? "Pas assez de Gems." : "Impossible de débloquer cette case."); }
+    if (result.ok) {
+      Sfx.unlock();
+      toast("Case débloquée avec des Gems !");
+    } else {
+      Sfx.error();
+      toast(
+        result.reason === "funds"
+          ? "Pas assez de Gems."
+          : "Impossible de débloquer cette case.",
+      );
+    }
     renderAll();
     if (result.ok) {
       renderCell(idx, { justUnlocked: true }); // unlock animation on top of renderAll()
@@ -199,35 +263,51 @@ function attemptMerge(fromIdx, toIdx) {
   const result = performMerge(state, fromIdx, toIdx);
   if (!result) return;
   const now = performance.now();
-  Game.mergeStreak = (now - Game.lastMergeAt < MERGE_STREAK_WINDOW_MS) ? Game.mergeStreak + 1 : 0;
+  Game.mergeStreak =
+    now - Game.lastMergeAt < MERGE_STREAK_WINDOW_MS ? Game.mergeStreak + 1 : 0;
   Game.lastMergeAt = now;
   // Easter egg "La Cascade": rolling window of recent merge times, kept in memory only.
   Game.mergeChainTimes.push(now);
-  Game.mergeChainTimes = Game.mergeChainTimes.filter(t => now - t <= EASTER_EGG_CHAIN_MS);
-  const chainEggResult = Game.mergeChainTimes.length >= EASTER_EGG_CHAIN_COUNT
-    ? unlockEasterEgg(state, "merge_chain") : null;
+  Game.mergeChainTimes = Game.mergeChainTimes.filter(
+    (t) => now - t <= EASTER_EGG_CHAIN_MS,
+  );
+  const chainEggResult =
+    Game.mergeChainTimes.length >= EASTER_EGG_CHAIN_COUNT
+      ? unlockEasterEgg(state, "merge_chain")
+      : null;
   renderCell(fromIdx);
   // Keep the old tile visible and delay every reward cue until the impact (~110 ms later).
   renderMergeStandIn(toIdx, before.tier, before.cycle || 0);
-  playMeteorMerge(toIdx, () => {
-    renderCell(toIdx, { merged: true });
-    HapticService.impact(result.newTier >= 8 ? "heavy" : "medium");
-    if (result.gemBonus) toast("+1 💎 Gem bonus !");
-    if (result.looped) {
-      toast(`✨ Nouvelle boucle amorcée - palier ×${result.newCycle} !`);
-    } else if (result.newTier === UNIVERSE_TIER) {
-      // Univers is the Big Bang milestone, so its toast replays on every loop.
-      toast("Univers créé ! 💥");
-    } else if (result.newTier === TIERS.length) {
-      toast(`${tierName(result.newTier)} atteint(e) - le sommet de la Création ! 🌟`);
-    } else {
-      toast(tierName(result.newTier) + " " + tierEmoji(result.newTier) + " !");
-    }
-    maybeOpenGodRitual();
-    maybeOpenGodRevealModal();
-    if (result.eggResult) revealEasterEgg(result.eggResult);
-    if (chainEggResult) revealEasterEgg(chainEggResult);
-  }, Game.mergeStreak, result.newTier);
+  playMeteorMerge(
+    toIdx,
+    () => {
+      renderCell(toIdx, { merged: true });
+      HapticService.impact(result.newTier >= 8 ? "heavy" : "medium");
+      if (result.gemBonus) toast("+1 💎 Gem bonus !");
+      if (result.looped) {
+        toast(`✨ Nouvelle boucle amorcée - palier ×${result.newCycle} !`);
+      } else if (result.newTier === UNIVERSE_TIER) {
+        // Univers is the Big Bang milestone, so its toast replays on every loop.
+        toast("Univers créé ! 💥");
+      } else if (result.newTier === TIERS.length) {
+        toast(
+          `${tierName(
+            result.newTier,
+          )} atteint(e) - le sommet de la Création ! 🌟`,
+        );
+      } else {
+        toast(
+          tierName(result.newTier) + " " + tierEmoji(result.newTier) + " !",
+        );
+      }
+      maybeOpenGodRitual();
+      maybeOpenGodRevealModal();
+      if (result.eggResult) revealEasterEgg(result.eggResult);
+      if (chainEggResult) revealEasterEgg(chainEggResult);
+    },
+    Game.mergeStreak,
+    result.newTier,
+  );
   Sfx.meteorImpact(result.newTier, Game.mergeStreak);
   updateHeader();
   updateFabs();
@@ -292,6 +372,7 @@ function grantTapBonus(idx, opts) {
   const auto = opts && opts.auto;
   const bonus = TAP_BONUS_PROD_SECONDS * effectiveTileProd(state, tile);
   grantStardust(state, bonus);
+  if (!auto) Game.recentTaps.push({ at: Date.now(), amount: bonus });
   updateQuestProgress(state, "tapBonuses", 1);
   if (!auto) resetErebusStreak(state);
   Game.cooldownUntil[idx] = now + TAP_COOLDOWN_MS;
@@ -319,7 +400,11 @@ function tryUnlock(idx) {
   const state = Game.state;
   if (state.unlocked[idx]) return;
   const cost = unlockCost(state.extraUnlockedCount);
-  if (state.stardust < cost) { toast("Pas assez de Stardust (" + formatNumber(cost) + "✨ requis)"); Sfx.error(); return; }
+  if (state.stardust < cost) {
+    toast("Pas assez de Stardust (" + formatNumber(cost) + "✨ requis)");
+    Sfx.error();
+    return;
+  }
   spendStardust(state, cost);
   state.unlocked[idx] = true;
   state.extraUnlockedCount += 1;
@@ -339,11 +424,24 @@ function tryUnlock(idx) {
 function doInvoke() {
   const state = Game.state;
   const cost = invokeCost(state.manualSpawnCount);
-  if (state.stardust < cost) { toast("Pas assez de Stardust pour invoquer."); Sfx.error(); return; }
-  let target = (Game.selectedIdx !== null && state.unlocked[Game.selectedIdx] && !state.grid[Game.selectedIdx]) ? Game.selectedIdx : null;
+  if (state.stardust < cost) {
+    toast("Pas assez de Stardust pour invoquer.");
+    Sfx.error();
+    return;
+  }
+  let target =
+    Game.selectedIdx !== null &&
+    state.unlocked[Game.selectedIdx] &&
+    !state.grid[Game.selectedIdx]
+      ? Game.selectedIdx
+      : null;
   if (target === null) {
     const empties = emptyUnlockedIndices(state);
-    if (empties.length === 0) { toast("La grille est pleine !"); Sfx.error(); return; }
+    if (empties.length === 0) {
+      toast("La grille est pleine !");
+      Sfx.error();
+      return;
+    }
     target = empties[Math.floor(Math.random() * empties.length)];
   }
   spendStardust(state, cost);
@@ -359,11 +457,24 @@ function doInvoke() {
 
 function doInvokeWithGems() {
   const state = Game.state;
-  if (state.gems < GEMS_INVOKE_COST) { toast("Pas assez de Gems."); Sfx.error(); return; }
-  let target = (Game.selectedIdx !== null && state.unlocked[Game.selectedIdx] && !state.grid[Game.selectedIdx]) ? Game.selectedIdx : null;
+  if (state.gems < GEMS_INVOKE_COST) {
+    toast("Pas assez de Gems.");
+    Sfx.error();
+    return;
+  }
+  let target =
+    Game.selectedIdx !== null &&
+    state.unlocked[Game.selectedIdx] &&
+    !state.grid[Game.selectedIdx]
+      ? Game.selectedIdx
+      : null;
   if (target === null) {
     const empties = emptyUnlockedIndices(state);
-    if (empties.length === 0) { toast("La grille est pleine !"); Sfx.error(); return; }
+    if (empties.length === 0) {
+      toast("La grille est pleine !");
+      Sfx.error();
+      return;
+    }
     target = empties[Math.floor(Math.random() * empties.length)];
   }
   state.gems -= GEMS_INVOKE_COST;
@@ -417,7 +528,12 @@ async function watchRewardedAd(state, placementId) {
   if (adsRemoved(state)) return true;
   const ok = await AdService.showRewarded(placementId);
   // The remove-ads promo also needs enough fusions and the shared promo gap.
-  if (ok && trackRewardedAdWatched(state) && state.lifetime.fusions >= FUSIONS_BEFORE_REMOVE_ADS_PROMO && promoGapElapsed(state)) {
+  if (
+    ok &&
+    trackRewardedAdWatched(state) &&
+    state.lifetime.fusions >= FUSIONS_BEFORE_REMOVE_ADS_PROMO &&
+    promoGapElapsed(state)
+  ) {
     state.promptsShown.removeAdsPrompt = true;
     markPromoShown(state);
     openRemoveAdsPromptModal();
@@ -438,7 +554,10 @@ async function maybeShowInterstitial() {
 
 function onBigBangConfirm() {
   const state = Game.state;
-  const runRecap = { stardustEarned: state.runStardustEarned, maxTier: state.maxTierThisRun };
+  const runRecap = {
+    stardustEarned: state.runStardustEarned,
+    maxTier: state.maxTierThisRun,
+  };
   const { gain, eggResult } = performBigBang(state);
   Game.bigBangPromptShown = false;
   Sfx.bigBang();
@@ -456,7 +575,9 @@ function onBigBangConfirm() {
 function onRestartConfirm() {
   const state = Game.state;
   // Easter egg "Le Renoncement": restart while Big Bang is available. Check before the reset.
-  const eggResult = hasUniverseTile(state) ? unlockEasterEgg(state, "restart_at_top") : null;
+  const eggResult = hasUniverseTile(state)
+    ? unlockEasterEgg(state, "restart_at_top")
+    : null;
   restartRun(state);
   Game.bigBangPromptShown = false;
   Sfx.bigBang();
@@ -478,7 +599,9 @@ async function onSaveCodeAction() {
         await navigator.clipboard.writeText(textarea.value);
         toast("Code copié !");
       } catch (e) {
-        toast("Copie automatique indisponible : sélectionne le texte et copie-le à la main.");
+        toast(
+          "Copie automatique indisponible : sélectionne le texte et copie-le à la main.",
+        );
       }
     } else {
       toast("Sélectionne le texte ci-dessus et copie-le à la main.");
@@ -486,7 +609,11 @@ async function onSaveCodeAction() {
     return;
   }
   const imported = importSaveCode(textarea.value);
-  if (!imported) { Sfx.error(); toast("Code invalide."); return; }
+  if (!imported) {
+    Sfx.error();
+    toast("Code invalide.");
+    return;
+  }
   Object.assign(Game.state, imported);
   Game.displayedStardust = Game.state.stardust;
   saveState(Game.state);
@@ -505,10 +632,12 @@ async function onOfflineCollect() {
 }
 async function onOfflineDouble() {
   const state = Game.state;
-  $("offlineCollect").disabled = true; $("offlineDouble").disabled = true;
+  $("offlineCollect").disabled = true;
+  $("offlineDouble").disabled = true;
   const ok = await watchRewardedAd(state, "offline_double");
   grantStardust(state, Game.pendingOfflineGain.gain * (ok ? 2 : 1));
-  $("offlineCollect").disabled = false; $("offlineDouble").disabled = false;
+  $("offlineCollect").disabled = false;
+  $("offlineDouble").disabled = false;
   $("offlineModal").classList.add("hidden");
   toast(ok ? "Gains doublés !" : "Publicité non complétée.");
   updateHeader();
@@ -567,57 +696,87 @@ function spinVisual(prizeIndex, cb) {
 }
 // renderAll(): the "1 case débloquée" prize changes state.unlocked, so the grid must redraw.
 function finishWheelSpin(prize) {
-  $("wheelResult").innerHTML = prize ? `Gagné : ${withCurrencyIcons(prize.label)}` : "Déjà utilisé aujourd'hui.";
+  $("wheelResult").innerHTML = prize
+    ? `Gagné : ${withCurrencyIcons(prize.label)}`
+    : "Déjà utilisé aujourd'hui.";
   Sfx.wheelWin();
   refreshWheelButtons();
   renderAll();
   saveState(Game.state);
 }
 function onWheelSpinFree() {
-  $("wheelSpinFree").disabled = true; $("wheelSpinAd").disabled = true;
+  $("wheelSpinFree").disabled = true;
+  $("wheelSpinAd").disabled = true;
   const prize = spinWheel(Game.state, false);
-  spinVisual(prize ? WHEEL_PRIZES.indexOf(prize) : 0, () => finishWheelSpin(prize));
+  spinVisual(prize ? WHEEL_PRIZES.indexOf(prize) : 0, () =>
+    finishWheelSpin(prize),
+  );
 }
 async function onWheelSpinAd() {
-  $("wheelSpinFree").disabled = true; $("wheelSpinAd").disabled = true;
+  $("wheelSpinFree").disabled = true;
+  $("wheelSpinAd").disabled = true;
   const ok = await watchRewardedAd(Game.state, "wheel_bonus");
-  if (!ok) { refreshWheelButtons(); return; }
+  if (!ok) {
+    refreshWheelButtons();
+    return;
+  }
   const prize = spinWheel(Game.state, true);
-  spinVisual(prize ? WHEEL_PRIZES.indexOf(prize) : 0, () => finishWheelSpin(prize));
+  spinVisual(prize ? WHEEL_PRIZES.indexOf(prize) : 0, () =>
+    finishWheelSpin(prize),
+  );
 }
 
 // ---------------- Unlock cell fab (rewarded ad) ----------------
 // Asks before showing an ad. Skipped when ads are removed: the reward is granted instantly.
 function confirmThenWatchAd(state, title, text, action) {
-  if (adsRemoved(state)) { action(); return; }
-  openConfirmModal({ title, text, confirmLabel: "Regarder la pub", onConfirm: action });
+  if (adsRemoved(state)) {
+    action();
+    return;
+  }
+  openConfirmModal({
+    title,
+    text,
+    confirmLabel: "Regarder la pub",
+    onConfirm: action,
+  });
 }
 
 function onUnlockCellAd() {
   const state = Game.state;
   if (Date.now() < state.cooldowns.unlockCellAdUntil) {
-    toast("Disponible dans " + formatDuration(state.cooldowns.unlockCellAdUntil - Date.now()));
+    toast(
+      "Disponible dans " +
+        formatDuration(state.cooldowns.unlockCellAdUntil - Date.now()),
+    );
     return;
   }
-  if (unlockedCount(state) >= TOTAL) { toast("Toutes les cases sont déjà débloquées !"); return; }
-  confirmThenWatchAd(state, "Case gratuite", "Regarder une publicité pour débloquer une case gratuitement ?", async () => {
-    if (!adsRemoved(state)) toast("📺 Chargement de la publicité...");
-    const ok = await watchRewardedAd(state, "unlock_cell");
-    if (!ok) return;
-    const result = grantFreeCellUnlock(state);
-    if (result.ok) {
-      renderCell(result.idx, { justUnlocked: true });
-      triggerResonanceIfLucky(state);
-      refreshLockedCellPrices();
-      Sfx.unlock();
-      toast("🔓 Case débloquée gratuitement !");
-    } else {
-      toast("Toutes les cases sont déjà débloquées !");
-    }
-    updateHeader();
-    updateFabs();
-    saveState(state);
-  });
+  if (unlockedCount(state) >= TOTAL) {
+    toast("Toutes les cases sont déjà débloquées !");
+    return;
+  }
+  confirmThenWatchAd(
+    state,
+    "Case gratuite",
+    "Regarder une publicité pour débloquer une case gratuitement ?",
+    async () => {
+      if (!adsRemoved(state)) toast("📺 Chargement de la publicité...");
+      const ok = await watchRewardedAd(state, "unlock_cell");
+      if (!ok) return;
+      const result = grantFreeCellUnlock(state);
+      if (result.ok) {
+        renderCell(result.idx, { justUnlocked: true });
+        triggerResonanceIfLucky(state);
+        refreshLockedCellPrices();
+        Sfx.unlock();
+        toast("🔓 Case débloquée gratuitement !");
+      } else {
+        toast("Toutes les cases sont déjà débloquées !");
+      }
+      updateHeader();
+      updateFabs();
+      saveState(state);
+    },
+  );
 }
 
 // ---------------- Gems-for-ad (shop + home screen) ----------------
@@ -635,21 +794,29 @@ function onWatchGemsAd() {
     return;
   }
   if (Date.now() < state.cooldowns.gemsAdUntil) {
-    toast("Disponible dans " + formatDuration(state.cooldowns.gemsAdUntil - Date.now()));
+    toast(
+      "Disponible dans " +
+        formatDuration(state.cooldowns.gemsAdUntil - Date.now()),
+    );
     return;
   }
-  confirmThenWatchAd(state, "Pub contre Gems", `Regarder une publicité pour recevoir ${GEMS_AD_REWARD} Gems ?`, async () => {
-    if (!adsRemoved(state)) toast("📺 Chargement de la publicité...");
-    const ok = await watchRewardedAd(state, "gems_ad");
-    if (!ok) return;
-    const granted = grantGemsFromAd(state);
-    Sfx.purchase();
-    toast(`+${granted} 💎 !`);
-    refreshCurrentPanel();
-    updateHeader();
-    updateFabs();
-    saveState(state);
-  });
+  confirmThenWatchAd(
+    state,
+    "Pub contre Gems",
+    `Regarder une publicité pour recevoir ${GEMS_AD_REWARD} Gems ?`,
+    async () => {
+      if (!adsRemoved(state)) toast("📺 Chargement de la publicité...");
+      const ok = await watchRewardedAd(state, "gems_ad");
+      if (!ok) return;
+      const granted = grantGemsFromAd(state);
+      Sfx.purchase();
+      toast(`+${granted} 💎 !`);
+      refreshCurrentPanel();
+      updateHeader();
+      updateFabs();
+      saveState(state);
+    },
+  );
 }
 
 // ---------------- Auto-clicker ----------------
@@ -658,18 +825,30 @@ function onAutoClickerClick() {
   const state = Game.state;
   if (Game.autoClickerArmed) {
     Game.autoClickerArmed = false;
-    toast(state.adRewards.autoClicker ? "Sélection annulée. Ta publicité reste acquise." : "Sélection annulée.");
+    toast(
+      state.adRewards.autoClicker
+        ? "Sélection annulée. Ta publicité reste acquise."
+        : "Sélection annulée.",
+    );
     renderAll();
     return;
   }
   const now = Date.now();
   if (state.autoClicker.activeUntil > now) {
-    toast("Clicker déjà actif encore " + formatDuration(state.autoClicker.activeUntil - now));
+    toast(
+      "Clicker déjà actif encore " +
+        formatDuration(state.autoClicker.activeUntil - now),
+    );
     return;
   }
   // adRewards.autoClicker: the watched ad stays earned if the picker is cancelled or the app reloads.
-  if (isAutoClickerFreeAvailable(state) || state.adRewards.autoClicker) { armAutoClickerPicker(); return; }
-  confirmThenWatchAd(state, "Clicker automatique",
+  if (isAutoClickerFreeAvailable(state) || state.adRewards.autoClicker) {
+    armAutoClickerPicker();
+    return;
+  }
+  confirmThenWatchAd(
+    state,
+    "Clicker automatique",
     "Ton clicker gratuit du jour est déjà utilisé. Regarde une publicité pour le relancer tout de suite, pour 10 minutes de plus.",
     async () => {
       if (!adsRemoved(state)) toast("📺 Chargement de la publicité...");
@@ -678,7 +857,8 @@ function onAutoClickerClick() {
       state.adRewards.autoClicker = true;
       saveState(state);
       armAutoClickerPicker();
-    });
+    },
+  );
 }
 function armAutoClickerPicker() {
   Game.autoClickerArmed = true;
@@ -688,7 +868,11 @@ function armAutoClickerPicker() {
 }
 function handleAutoClickerPick(idx) {
   const state = Game.state;
-  if (!state.unlocked[idx] || !state.grid[idx]) { toast("Choisis une case débloquée avec une tuile."); Sfx.error(); return; }
+  if (!state.unlocked[idx] || !state.grid[idx]) {
+    toast("Choisis une case débloquée avec une tuile.");
+    Sfx.error();
+    return;
+  }
   Game.autoClickerArmed = false;
   // The daily free use is spent first, so an ad reward kept from a previous day isn't wasted.
   if (!isAutoClickerFreeAvailable(state)) state.adRewards.autoClicker = false;
@@ -705,7 +889,8 @@ function tickAutoClicker() {
   const ac = state.autoClicker;
   const idx = ac.targetIdx;
   const isActive = idx !== null && ac.activeUntil > Date.now();
-  if (idx !== null && cellEls[idx]) cellEls[idx].classList.toggle("autoClickTarget", isActive);
+  if (idx !== null && cellEls[idx])
+    cellEls[idx].classList.toggle("autoClickTarget", isActive);
   if (!isActive || !state.grid[idx]) return; // inactive, or target cell empty (paused)
   if (grantTapBonus(idx, { auto: true })) playAutoClickEffect(idx);
 }
@@ -721,7 +906,7 @@ function playAutoClickEffect(idx) {
 // The Boutique card already confirms through buyBtn() (ui.js).
 function onSwapCellsClick() {
   const state = Game.state;
-  const cost = SHOP_GEM_ITEMS.find(i => i.id === "swapCells").cost;
+  const cost = SHOP_GEM_ITEMS.find((i) => i.id === "swapCells").cost;
   // A swap already earned with an ad but not used yet (e.g. lost to a reload) is used before any Gems.
   if (state.adRewards.freeSwap) {
     Game.swapArmed = true;
@@ -734,11 +919,18 @@ function onSwapCellsClick() {
   // Not enough Gems: offer an ad for a free swap instead.
   if (state.gems < cost) {
     if (Date.now() < state.cooldowns.swapAdUntil) {
-      toast("Disponible dans " + formatDuration(state.cooldowns.swapAdUntil - Date.now()));
+      toast(
+        "Disponible dans " +
+          formatDuration(state.cooldowns.swapAdUntil - Date.now()),
+      );
       return;
     }
-    confirmThenWatchAd(state, "Pas assez de Gems",
-      `Il te manque des Gems pour échanger deux cases (${cost} ${currencyIconHtml("gems")} nécessaires). Regarder une publicité pour échanger gratuitement à la place ?`,
+    confirmThenWatchAd(
+      state,
+      "Pas assez de Gems",
+      `Il te manque des Gems pour échanger deux cases (${cost} ${currencyIconHtml(
+        "gems",
+      )} nécessaires). Regarder une publicité pour échanger gratuitement à la place ?`,
       async () => {
         if (!adsRemoved(state)) toast("📺 Chargement de la publicité...");
         const ok = await watchRewardedAd(state, "swap_cells_free");
@@ -750,13 +942,19 @@ function onSwapCellsClick() {
         toast("Choisis deux cases à échanger.");
         renderAll();
         saveState(state);
-      });
+      },
+    );
     return;
   }
-  if (state.dontAskAgain.swapConfirm) { onBuyGemItem("swapCells"); return; }
+  if (state.dontAskAgain.swapConfirm) {
+    onBuyGemItem("swapCells");
+    return;
+  }
   openConfirmModal({
     title: "Échanger deux cases",
-    text: `Dépenser ${cost} ${currencyIconHtml("gems")} pour échanger le contenu de deux cases ?`,
+    text: `Dépenser ${cost} ${currencyIconHtml(
+      "gems",
+    )} pour échanger le contenu de deux cases ?`,
     confirmLabel: "Échanger",
     dontAskKey: "swapConfirm",
     onConfirm: () => onBuyGemItem("swapCells"),
@@ -771,7 +969,13 @@ function onBuyGemItem(itemId) {
     return;
   }
   if (itemId === "swapCells") {
-    if (Game.state.gems < SHOP_GEM_ITEMS.find(i => i.id === "swapCells").cost) { Sfx.error(); toast("Pas assez de Gems."); return; }
+    if (
+      Game.state.gems < SHOP_GEM_ITEMS.find((i) => i.id === "swapCells").cost
+    ) {
+      Sfx.error();
+      toast("Pas assez de Gems.");
+      return;
+    }
     Game.swapArmed = true;
     Game.swapFirstIdx = null;
     // Paid swap: clear any leftover free swap from an abandoned ad-earned one.
@@ -782,13 +986,21 @@ function onBuyGemItem(itemId) {
     return;
   }
   const result = buyGemShopItem(Game.state, itemId);
-  if (!result.ok) { Sfx.error(); toast("Pas assez de Gems."); return; }
+  if (!result.ok) {
+    Sfx.error();
+    toast("Pas assez de Gems.");
+    return;
+  }
   Sfx.purchase();
   if (itemId === "cosmicBox") {
     openCosmicBoxRevealModal(result.box);
   } else if (itemId === "streakFreeze") {
     // No visible change otherwise, so the toast names the effect and the charge count.
-    toast("❄️ Gel de série ajouté ! (" + Game.state.dailyLogin.streakFreezeCharges + " en réserve)");
+    toast(
+      "❄️ Gel de série ajouté ! (" +
+        Game.state.dailyLogin.streakFreezeCharges +
+        " en réserve)",
+    );
   } else {
     toast("Achat effectué !");
   }
@@ -804,7 +1016,11 @@ function onCosmeticAction(id, owned) {
     equipCosmetic(state, id);
   } else {
     const result = buyCosmeticWithGems(state, id);
-    if (!result.ok) { Sfx.error(); toast("Pas assez de Gems."); return; }
+    if (!result.ok) {
+      Sfx.error();
+      toast("Pas assez de Gems.");
+      return;
+    }
     equipCosmetic(state, id);
     Sfx.purchase();
   }
@@ -821,28 +1037,63 @@ function onSetIconStyle(style) {
   saveState(state);
 }
 async function onBuyIAP(productId) {
-  const product = IAP_CATALOG.find(p => p.id === productId);
+  const product = IAP_CATALOG.find((p) => p.id === productId);
   const res = await IAPService.purchase(productId);
   if (!res.success) return;
   const state = Game.state;
   switch (productId) {
-    case "remove_ads": state.iap.removeAds = true; break;
+    case "remove_ads":
+      state.iap.removeAds = true;
+      break;
     case "starter_pack":
       // One-time purchase: never grant twice.
       if (state.iap.starterPack) break;
       state.iap.starterPack = true;
-      state.gems += 500; state.lifetime.gemsEarned += 500;
-      { const locked = []; for (let i = 0; i < TOTAL; i++) if (!state.unlocked[i]) locked.push(i);
-        for (let k = 0; k < 3 && locked.length; k++) { const pick = locked.splice(Math.floor(Math.random() * locked.length), 1)[0]; state.unlocked[pick] = true; state.extraUnlockedCount += 1; } }
+      state.gems += 500;
+      state.lifetime.gemsEarned += 500;
+      {
+        const locked = [];
+        for (let i = 0; i < TOTAL; i++) if (!state.unlocked[i]) locked.push(i);
+        for (let k = 0; k < 3 && locked.length; k++) {
+          const pick = locked.splice(
+            Math.floor(Math.random() * locked.length),
+            1,
+          )[0];
+          state.unlocked[pick] = true;
+          state.extraUnlockedCount += 1;
+        }
+      }
       // 1h auto-clicker on the highest-tier tile. keepFreeDaily: doesn't consume today's free use.
-      { let bestIdx = null, bestTier = 0;
-        for (let i = 0; i < TOTAL; i++) { const t = state.grid[i]; if (t && t.tier > bestTier) { bestTier = t.tier; bestIdx = i; } }
-        if (bestIdx !== null) activateAutoClicker(state, bestIdx, { durationMs: 3600000, keepFreeDaily: true }); }
+      {
+        let bestIdx = null,
+          bestTier = 0;
+        for (let i = 0; i < TOTAL; i++) {
+          const t = state.grid[i];
+          if (t && t.tier > bestTier) {
+            bestTier = t.tier;
+            bestIdx = i;
+          }
+        }
+        if (bestIdx !== null)
+          activateAutoClicker(state, bestIdx, {
+            durationMs: 3600000,
+            keepFreeDaily: true,
+          });
+      }
       break;
-    case "gems_small": case "gems_medium": case "gems_large": case "gems_mega":
-      state.gems += product.amount; state.lifetime.gemsEarned += product.amount; break;
-    case "vip_monthly": state.iap.vipUntil = Date.now() + 30 * 24 * 3600 * 1000; break;
-    case "stardust_boost": state.iap.stardustBoost = true; break;
+    case "gems_small":
+    case "gems_medium":
+    case "gems_large":
+    case "gems_mega":
+      state.gems += product.amount;
+      state.lifetime.gemsEarned += product.amount;
+      break;
+    case "vip_monthly":
+      state.iap.vipUntil = Date.now() + 30 * 24 * 3600 * 1000;
+      break;
+    case "stardust_boost":
+      state.iap.stardustBoost = true;
+      break;
   }
   Sfx.purchase();
   refreshCurrentPanel();
@@ -869,7 +1120,11 @@ function onEquipGodFromUnlockModal() {
 }
 function onBuyGod(godId) {
   const result = buyGodWithGems(Game.state, godId);
-  if (!result.ok) { Sfx.error(); toast("Pas assez de Gems."); return; }
+  if (!result.ok) {
+    Sfx.error();
+    toast("Pas assez de Gems.");
+    return;
+  }
   refreshCurrentPanel();
   updateHeader();
   saveState(Game.state);
@@ -877,7 +1132,15 @@ function onBuyGod(godId) {
 }
 function onBuyGodPower(godId) {
   const result = buyGodPowerLevel(Game.state, godId);
-  if (!result.ok) { Sfx.error(); toast(result.reason === "max" ? "Niveau maximum atteint." : "Pas assez de Gems."); return; }
+  if (!result.ok) {
+    Sfx.error();
+    toast(
+      result.reason === "max"
+        ? "Niveau maximum atteint."
+        : "Pas assez de Gems.",
+    );
+    return;
+  }
   Sfx.purchase();
   toast(`${getGod(godId).name} — niveau de pouvoir ${result.newLevel} !`);
   refreshCurrentPanel();
@@ -899,7 +1162,15 @@ function onProfileSave() {
 
 function onBuySkill(key) {
   const result = buySkill(Game.state, key);
-  if (!result.ok) { Sfx.error(); toast(result.reason === "max" ? "Niveau maximum atteint." : "Pas assez d'Énergie Cosmique."); return; }
+  if (!result.ok) {
+    Sfx.error();
+    toast(
+      result.reason === "max"
+        ? "Niveau maximum atteint."
+        : "Pas assez d'Énergie Cosmique.",
+    );
+    return;
+  }
   Sfx.purchase();
   toast(SKILL_TREE[key].name + " amélioré !");
   refreshCurrentPanel();
@@ -908,7 +1179,15 @@ function onBuySkill(key) {
 }
 function onBuyRunUpgrade(key) {
   const result = buyRunUpgrade(Game.state, key);
-  if (!result.ok) { Sfx.error(); toast(result.reason === "max" ? "Niveau maximum atteint." : "Pas assez de Stardust."); return; }
+  if (!result.ok) {
+    Sfx.error();
+    toast(
+      result.reason === "max"
+        ? "Niveau maximum atteint."
+        : "Pas assez de Stardust.",
+    );
+    return;
+  }
   Sfx.purchase();
   toast(RUN_UPGRADE_TREE[key].name + " amélioré !");
   refreshCurrentPanel();
@@ -933,10 +1212,20 @@ async function onBonusAdQuest() {
     markBonusAdQuestDone(state);
     // Ads removed: there's no separate "watch" step for the player to see,
     // so go straight on to claiming instead of leaving a second tap behind.
-    if (!adsRemoved(state)) { refreshCurrentPanel(); saveState(state); return; }
+    if (!adsRemoved(state)) {
+      refreshCurrentPanel();
+      saveState(state);
+      return;
+    }
   }
   const reward = claimBonusAdQuest(state);
-  if (reward) { Sfx.quest(); toast(`Quête bonus réclamée : +${reward} 💎`); refreshCurrentPanel(); updateHeader(); saveState(state); }
+  if (reward) {
+    Sfx.quest();
+    toast(`Quête bonus réclamée : +${reward} 💎`);
+    refreshCurrentPanel();
+    updateHeader();
+    saveState(state);
+  }
 }
 
 // ---------------- Wiring ----------------
@@ -945,10 +1234,16 @@ async function onBonusAdQuest() {
 // site. Buttons that already play their own distinct sound synchronously on
 // click (Invoquer, Big Bang confirm) either stop propagation or are excluded
 // by id below, so this never doubles up with them.
-const SILENT_CLICK_IDS = new Set(["bigBangConfirm", "invokeBtnStardust", "invokeBtnGems"]);
+const SILENT_CLICK_IDS = new Set([
+  "bigBangConfirm",
+  "invokeBtnStardust",
+  "invokeBtnGems",
+]);
 function wireClickSound() {
   document.addEventListener("click", (e) => {
-    const el = e.target.closest(".btn, .drawerItem, .iconBtn, .fab, .switch, .tabBtn");
+    const el = e.target.closest(
+      ".btn, .drawerItem, .iconBtn, .fab, .switch, .tabBtn",
+    );
     if (!el || el.disabled || SILENT_CLICK_IDS.has(el.id)) return;
     Sfx.click();
   });
@@ -969,7 +1264,11 @@ function wireModalBackdropClose() {
   };
   document.addEventListener("click", (e) => {
     const overlay = e.target;
-    if (!overlay.classList.contains("modalOverlay") || MODAL_BACKDROP_LOCKED.has(overlay.id)) return;
+    if (
+      !overlay.classList.contains("modalOverlay") ||
+      MODAL_BACKDROP_LOCKED.has(overlay.id)
+    )
+      return;
     const close = closeHandlers[overlay.id];
     if (close) close();
     else overlay.classList.add("hidden");
@@ -982,16 +1281,32 @@ function wireEvents() {
   document.addEventListener("pointerdown", onPointerDown, { passive: false });
   document.addEventListener("touchstart", onPointerDown, { passive: false });
 
-  dom.invokeBtnStardust.addEventListener("click", () => { ensureAudio(); doInvoke(); });
-  dom.invokeBtnGems.addEventListener("click", () => { ensureAudio(); doInvokeWithGems(); });
+  dom.invokeBtnStardust.addEventListener("click", () => {
+    ensureAudio();
+    doInvoke();
+  });
+  dom.invokeBtnGems.addEventListener("click", () => {
+    ensureAudio();
+    doInvokeWithGems();
+  });
   dom.bigBangBtn.addEventListener("click", () => openBigBangModal());
   dom.menuBtn.addEventListener("click", () => openDrawer());
   dom.drawerClose.addEventListener("click", closeDrawer);
-  $("drawerHeadEdit").addEventListener("click", (e) => { e.stopPropagation(); closeDrawer(); openProfileModal(); });
+  $("drawerHeadEdit").addEventListener("click", (e) => {
+    e.stopPropagation();
+    closeDrawer();
+    openProfileModal();
+  });
   $("profileCancel").addEventListener("click", closeProfileModal);
   $("profileSave").addEventListener("click", onProfileSave);
-  dom.drawerOverlay.addEventListener("click", (e) => { if (e.target === dom.drawerOverlay) closeDrawer(); });
-  document.querySelectorAll(".drawerItem[data-panel]").forEach(b => b.addEventListener("click", () => openPanel(b.dataset.panel)));
+  dom.drawerOverlay.addEventListener("click", (e) => {
+    if (e.target === dom.drawerOverlay) closeDrawer();
+  });
+  document
+    .querySelectorAll(".drawerItem[data-panel]")
+    .forEach((b) =>
+      b.addEventListener("click", () => openPanel(b.dataset.panel)),
+    );
   dom.panelClose.addEventListener("click", closePanel);
 
   $("fabShop").addEventListener("click", () => openPanel("shop"));
@@ -1013,7 +1328,10 @@ function wireEvents() {
   $("skinManagerClose").addEventListener("click", closeSkinManagerModal);
   $("skinPreviewClose").addEventListener("click", closeSkinPreviewModal);
   $("cosmicBoxClose").addEventListener("click", closeCosmicBoxModal);
-  $("purchaseConfirmClose").addEventListener("click", closePurchaseConfirmModal);
+  $("purchaseConfirmClose").addEventListener(
+    "click",
+    closePurchaseConfirmModal,
+  );
 
   $("fabSecrets").addEventListener("click", openSecretsModal);
   $("secretsClose").addEventListener("click", closeSecretsModal);
@@ -1027,11 +1345,21 @@ function wireEvents() {
   $("gemsPill").addEventListener("click", openGemsMenuModal);
   $("stardustPill").addEventListener("click", openStardustInfoModal);
   $("stardustInfoClose").addEventListener("click", closeStardustInfoModal);
-  $("gemsMenuShop").addEventListener("click", () => { closeGemsMenuModal(); openPanel("shop"); });
-  $("gemsMenuGods").addEventListener("click", () => { closeGemsMenuModal(); openPanel("gods"); });
+  $("gemsMenuShop").addEventListener("click", () => {
+    closeGemsMenuModal();
+    openPanel("shop");
+  });
+  $("gemsMenuGods").addEventListener("click", () => {
+    closeGemsMenuModal();
+    openPanel("gods");
+  });
   $("gemsMenuClose").addEventListener("click", closeGemsMenuModal);
 
-  $("tutNext").addEventListener("click", () => { tutIndex++; if (tutIndex >= TUT_STEPS.length) endTutorial(); else showTutStep(tutIndex); });
+  $("tutNext").addEventListener("click", () => {
+    tutIndex++;
+    if (tutIndex >= TUT_STEPS.length) endTutorial();
+    else showTutStep(tutIndex);
+  });
   $("tutSkip").addEventListener("click", () => endTutorial());
 
   $("offlineCollect").addEventListener("click", onOfflineCollect);
@@ -1057,10 +1385,13 @@ function wireEvents() {
 
   $("bbSummaryClose").addEventListener("click", closeBigBangSummaryModal);
 
-  $("removeAdsPromptLater").addEventListener("click", closeRemoveAdsPromptModal);
+  $("removeAdsPromptLater").addEventListener(
+    "click",
+    closeRemoveAdsPromptModal,
+  );
   $("removeAdsPromptBuy").addEventListener("click", () => {
     closeRemoveAdsPromptModal();
-    const product = IAP_CATALOG.find(p => p.id === "remove_ads");
+    const product = IAP_CATALOG.find((p) => p.id === "remove_ads");
     openConfirmModal({
       title: product.name,
       text: `${product.desc} — ${product.price}`,
@@ -1073,7 +1404,7 @@ function wireEvents() {
   $("fusionPromoBuy").addEventListener("click", () => {
     const id = fusionPromoProductId;
     closeFusionPromoModal();
-    const product = id && IAP_CATALOG.find(p => p.id === id);
+    const product = id && IAP_CATALOG.find((p) => p.id === id);
     if (!product) return;
     openConfirmModal({
       title: product.name,
