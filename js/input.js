@@ -290,7 +290,7 @@ function grantTapBonus(idx, opts) {
   const tile = state.grid[idx];
   if (!tile) return 0;
   const auto = opts && opts.auto;
-  const bonus = 5 * effectiveTileProd(state, tile);
+  const bonus = TAP_BONUS_PROD_SECONDS * effectiveTileProd(state, tile);
   grantStardust(state, bonus);
   updateQuestProgress(state, "tapBonuses", 1);
   if (!auto) resetErebusStreak(state);

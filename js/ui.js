@@ -255,7 +255,7 @@ function updateHeader() {
   const stardustStr = formatNumber(Game.displayedStardust);
   if (stardustStr !== lastHeaderRender.stardust) { dom.stardustValue.textContent = stardustStr; lastHeaderRender.stardust = stardustStr; }
 
-  const rateStr = "+" + formatNumber(totalProduction(state)) + "/s";
+  const rateStr = "+" + formatNumber(displayedProduction(state)) + "/s";
   if (rateStr !== lastHeaderRender.rate) { dom.stardustRate.textContent = rateStr; lastHeaderRender.rate = rateStr; }
 
   const gemsStr = formatNumber(state.gems);
@@ -1437,7 +1437,7 @@ function onConfirmActionConfirm() {
 function openStardustInfoModal() {
   const state = Game.state;
   ensureDailyStats(state);
-  $("stardustInfoRate").textContent = "+" + formatNumber(totalProduction(state)) + "/s";
+  $("stardustInfoRate").textContent = "+" + formatNumber(displayedProduction(state)) + "/s";
   const runElapsedMs = Date.now() - state.runStartedAt;
   $("stardustInfoRunTime").textContent = formatDuration(runElapsedMs);
   $("stardustInfoToday").textContent = "+" + formatNumber(state.lifetime.stardustEarned - state.dailyStats.stardustAtDayStart);

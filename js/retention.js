@@ -62,7 +62,7 @@ function checkFusionPromo(state) {
   return null;
 }
 
-// Offline auto-clicker: grantTapBonus pays 5x the tile's production every TAP_COOLDOWN_MS.
+// Offline auto-clicker: grantTapBonus pays TAP_BONUS_PROD_SECONDS x the tile's production every TAP_COOLDOWN_MS.
 // Limited to the time left on the clicker when the app closed, and to the offline cap.
 function autoClickerOfflineGain(state, cappedMs) {
   const ac = state.autoClicker;
@@ -72,7 +72,7 @@ function autoClickerOfflineGain(state, cappedMs) {
   const activeMs = Math.min(cappedMs, activeMsAtClose);
   const tile = state.grid[ac.targetIdx];
   if (!tile) return 0; // empty target: paused, like online
-  return 5 * effectiveTileProd(state, tile) * (activeMs / TAP_COOLDOWN_MS);
+  return TAP_BONUS_PROD_SECONDS * effectiveTileProd(state, tile) * (activeMs / TAP_COOLDOWN_MS);
 }
 
 // ---- Offline gains ----
