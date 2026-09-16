@@ -38,6 +38,9 @@ function requestStorageAccessBestEffort() {
     autoClickerArmed: false,
     // God ids waiting for their unlock modal (maybeOpenGodRevealModal, ui.js).
     pendingGodReveals: [],
+    // Manual tap bonuses of the last MANUAL_TAP_RATE_WINDOW_MS ({ at, amount }),
+    // averaged into the displayed rate by manualTapProduction().
+    recentTaps: [],
     // Merges chained within MERGE_STREAK_WINDOW_MS; raises the combo chime.
     mergeStreak: 0,
     lastMergeAt: 0,
