@@ -252,6 +252,19 @@ function totalProduction(state) {
   return p * productionMultiplier(state);
 }
 
+// Stardust the auto-clicker adds per second while it runs: grantTapBonus (input.js)
+// pays TAP_BONUS_PROD_SECONDS x the target tile's production every TAP_COOLDOWN_MS.
+// Kept out of totalProduction(), which the main loop and computeOfflineGain() pay on their own.
+function autoClickerProduction(state) {
+  const ac = state.autoClicker;
+  if (ac.targetIdx === null || ac.activeUntil <= Date.now()) return 0;
+  const tile = state.grid[ac.targetIdx];
+  if (!tile) return 0; // empty target: paused, like tickAutoClicker
+  return TAP_BONUS_PROD_SECONDS * effectiveTileProd(state, tile) * (1000 / TAP_COOLDOWN_MS);
+}
+// Rate shown to the player: everything Stardust is currently coming in at.
+function displayedProduction(state) { return totalProduction(state) + autoClickerProduction(state); }
+
 function isVipActive(state) { return state.iap.vipUntil > Date.now(); }
 function adsRemoved(state) { return state.iap.removeAds || isVipActive(state); }
 // Owned one-time purchases are hidden from the shop and promos.

@@ -9,6 +9,8 @@ const BASE_AUTO_SPAWN_MS = 8000;
 const MIN_AUTO_SPAWN_MS = 3000;
 // Per-cell cooldown between tap-bonus taps (grantTapBonus, input.js). Short so taps chain.
 const TAP_COOLDOWN_MS = 150;
+// A tap pays this many seconds of the tapped tile's production.
+const TAP_BONUS_PROD_SECONDS = 5;
 const DRAG_THRESHOLD = 10;
 const BASE_OFFLINE_CAP_H = 8;
 const MAX_OFFLINE_CAP_H = 24;
