@@ -108,6 +108,18 @@ function withCurrencyIcons(text) {
     .replace(/⚡/g, currencyIconHtml("energy"));
 }
 
+// A tier's artwork is only fetched when that tier first lands on the grid, which shows
+// an empty tile until the file arrives. Warm the whole set on its first render instead.
+const preloadedIconSets = new Set();
+function preloadIconSet(set) {
+  if (preloadedIconSets.has(set.id)) return;
+  preloadedIconSets.add(set.id);
+  for (let tier = 1; tier <= TIERS.length; tier++) {
+    const src = (set.tierSkin && set.tierSkin[tier - 1]) || TIERS[tier - 1];
+    if (src.icon) new Image().src = "assets/tiles/" + src.icon;
+  }
+}
+
 // Tile icon: artwork from the set's tierSkin entry (or TIERS for classic), else the emoji.
 // `setOverride` renders another set without equipping it (skin preview).
 function tierIconNode(tier, setOverride) {
@@ -116,6 +128,7 @@ function tierIconNode(tier, setOverride) {
   const src = skinEntry || TIERS[tier - 1];
   // Falls back to the emoji when the set has no art for this tier.
   if (src.icon && Game.state.iconStyle !== "emoji") {
+    preloadIconSet(s);
     const img = document.createElement("img");
     img.className = "emoji tierIcon";
     img.src = "assets/tiles/" + src.icon;
