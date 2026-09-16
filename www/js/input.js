@@ -561,15 +561,17 @@ function onBigBangConfirm() {
   const { gain, eggResult } = performBigBang(state);
   Game.bigBangPromptShown = false;
   Sfx.bigBang();
-  HapticService.impact("success");
   closeBigBangModal();
-  renderAll();
   saveState(state);
-  maybeShowInterstitial();
-  openBigBangSummaryModal({ ...runRecap, gain });
-  // Shown after the Big Bang summary, not instead of it.
-  if (eggResult) revealEasterEgg(eggResult);
-  maybeOpenGodRevealModal(); // e.g. Thanatos, unlocked inside performBigBang
+  // The state grid is already empty: the animation keeps the finished run on
+  // screen, redraws it mid-flash, and hands over to the summary once it ends.
+  playBigBangAnimation(renderAll, () => {
+    maybeShowInterstitial();
+    openBigBangSummaryModal({ ...runRecap, gain });
+    // Shown after the Big Bang summary, not instead of it.
+    if (eggResult) revealEasterEgg(eggResult);
+    maybeOpenGodRevealModal(); // e.g. Thanatos, unlocked inside performBigBang
+  });
 }
 
 function onRestartConfirm() {
