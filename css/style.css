@@ -160,6 +160,11 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 .cell.impactHero{z-index:20;}
 .tile.spawnIn{animation:spawnIn .25s ease;}
 @keyframes spawnIn{0%{transform:scale(0)}100%{transform:scale(1)}}
+/* mergePop/spawnIn replace .tile.cycled's animation, so the loop glow has to be re-declared
+   here. It comes first: mergePop then owns box-shadow while it runs, and the glow takes it
+   back once the one-shot animation ends. */
+.tile.cycled.merging{animation:cycleGlow 2.2s ease-in-out infinite, mergePop .42s cubic-bezier(.16,1,.3,1);}
+.tile.cycled.spawnIn{animation:cycleGlow 2.2s ease-in-out infinite, spawnIn .25s ease;}
 
 /* One-shot pop on a newly unlocked cell (renderCell's opts.justUnlocked). */
 .cell.unlockPop{animation:unlockPop .6s cubic-bezier(.16,1,.3,1);}
