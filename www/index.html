@@ -663,5 +663,14 @@
     <script src="js/input.js?v=122"></script>
     <script src="js/main.js?v=122"></script>
     <script type="module" src="js/native-bridge.js"></script>
+    <script>
+      // Debug panel: opt-in with ?debug=1. The file is never referenced by the
+      // native build, so it can't ship in a store binary (js/debug.js).
+      if (new URLSearchParams(location.search).has("debug")) {
+        const debugScript = document.createElement("script");
+        debugScript.src = "js/debug.js";
+        document.body.appendChild(debugScript);
+      }
+    </script>
   </body>
 </html>
