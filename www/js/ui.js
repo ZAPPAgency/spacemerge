@@ -1426,12 +1426,23 @@ function playBigBangAnimation(onReset, onDone) {
 
   // Everything blasts out of the grid the player just completed, not the screen center.
   const rect = dom.grid.getBoundingClientRect();
-  overlay.style.setProperty("--bx", (rect.left + rect.width / 2) + "px");
-  overlay.style.setProperty("--by", (rect.top + rect.height / 2) + "px");
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  overlay.style.setProperty("--bx", cx + "px");
+  overlay.style.setProperty("--by", cy + "px");
+  // That center sits high on a phone, so rings and shards are sized from the
+  // farthest screen corner - otherwise they stop short of the bottom edge.
+  const reach = Math.hypot(
+    Math.max(cx, window.innerWidth - cx),
+    Math.max(cy, window.innerHeight - cy),
+  );
 
   const SHOCK_COUNT = 3;
+  // .bigBangFxShock is 40px wide, so a scale of reach/20 puts its edge on that corner.
+  const shockScale = Math.ceil((reach / 20) * 1.05);
   for (let i = 0; i < SHOCK_COUNT; i++) {
     const shock = el("div", "bigBangFxShock");
+    shock.style.setProperty("--shockScale", String(shockScale));
     shock.style.setProperty("--shockDelay", (i * 0.13).toFixed(2) + "s");
     burstHost.appendChild(shock);
   }
@@ -1443,13 +1454,11 @@ function playBigBangAnimation(onReset, onDone) {
     ray.style.setProperty("--rayDelay", (i % 3 === 0 ? "0.16s" : "0s"));
     burstHost.appendChild(ray);
   }
-  // Thrown outward far enough to leave the screen, whatever the grid's position.
-  const reach = Math.max(window.innerWidth, window.innerHeight);
   const SHARD_COUNT = 16;
   for (let i = 0; i < SHARD_COUNT; i++) {
     const shard = el("div", "bigBangFxShard");
     const angle = (i / SHARD_COUNT) * Math.PI * 2 + Math.random() * 0.4;
-    const dist = reach * (0.4 + Math.random() * 0.45);
+    const dist = reach * (0.55 + Math.random() * 0.5);
     shard.style.setProperty("--dx", Math.round(Math.cos(angle) * dist) + "px");
     shard.style.setProperty("--dy", Math.round(Math.sin(angle) * dist) + "px");
     shard.style.setProperty("--shardScale", (0.6 + Math.random() * 0.9).toFixed(2));
