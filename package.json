@@ -4,7 +4,7 @@
   "private": true,
   "description": "Spacemerge - jeu merge/idle/prestige spatial (Capacitor iOS)",
   "scripts": {
-    "build": "vite build",
+    "build": "node scripts/copy-web.mjs && vite build",
     "sync": "npm run build && cap sync ios",
     "open:ios": "cap open ios",
     "assets": "capacitor-assets generate --ios"
