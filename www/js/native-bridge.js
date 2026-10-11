@@ -9,10 +9,8 @@
 // versions, WITHOUT any other game file needing to change — that separation
 // is the entire point of the AdService/IAPService abstraction from Étape 4.
 //
-// NOTE: plugin method/type names below match each package's docs at the time
-// of writing. Re-check each plugin's README once installed — community
-// plugin APIs (AdMob, RevenueCat, GameConnect in particular) do shift across
-// major versions — and adjust before shipping.
+// Community plugin APIs (AdMob, RevenueCat) change across major versions:
+// check their README when upgrading.
 import { Capacitor } from "@capacitor/core";
 import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
 import { Preferences } from "@capacitor/preferences";
@@ -21,7 +19,6 @@ import { StatusBar, Style } from "@capacitor/status-bar";
 import { SplashScreen } from "@capacitor/splash-screen";
 import { AdMob } from "@capacitor-community/admob";
 import { Purchases, LOG_LEVEL } from "@revenuecat/purchases-capacitor";
-import { GameConnect } from "@openforge/capacitor-game-connect";
 
 if (!Capacitor || !Capacitor.isNativePlatform || !Capacitor.isNativePlatform()) {
   // Plain browser. The bare imports above only resolve in the Vite build, so the web
@@ -117,25 +114,6 @@ async function bootNative() {
   };
   window.IAPService.isSubscribed = function (_productId) {
     return Game.state ? isVipActive(Game.state) : false;
-  };
-
-  // ---- Game Center (leaderboards & achievements) ----
-  try {
-    await GameConnect.signIn();
-  } catch (e) { console.warn("Game Center sign-in failed (user may have declined)", e); }
-  window.GameCenterService = {
-    async submitScore(leaderboardId, score) {
-      try { await GameConnect.submitScore({ leaderboardID: leaderboardId, totalScoreAmount: score }); }
-      catch (e) { console.warn("submitScore failed", e); }
-    },
-    async showLeaderboard(leaderboardId) {
-      try { await GameConnect.showLeaderboard({ leaderboardID: leaderboardId }); }
-      catch (e) { console.warn("showLeaderboard failed", e); }
-    },
-    async unlockAchievement(achievementId, percentComplete) {
-      try { await GameConnect.unlockAchievement({ achievementID: achievementId, percentComplete: percentComplete ?? 100 }); }
-      catch (e) { console.warn("unlockAchievement failed", e); }
-    },
   };
 
   // ---- Local notifications: "come back" reminder scheduled on background ----

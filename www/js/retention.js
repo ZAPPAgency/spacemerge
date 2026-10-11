@@ -242,9 +242,8 @@ function checkAchievements(state) {
       newly.push(a);
     }
   }
-  // Game Center sync is a no-op on web; native-bridge.js defines
-  // window.GameCenterService once running inside Capacitor (see docs/BUILD_IOS.md
-  // for the leaderboard/achievement IDs these calls expect in App Store Connect).
+  // No-op until a native bridge defines window.GameCenterService (no Game Center
+  // plugin is installed). The IDs must match App Store Connect / Play Console.
   if (window.GameCenterService) {
     newly.forEach(a => window.GameCenterService.unlockAchievement(a.id, 100));
     window.GameCenterService.submitScore("maxTier", state.lifetime.maxTierEver);

@@ -10,21 +10,20 @@
     "assets": "capacitor-assets generate --ios"
   },
   "dependencies": {
-    "@capacitor/core": "^8.5.0",
+    "@capacitor-community/admob": "^8.1.0",
     "@capacitor/app": "^8.1.1",
+    "@capacitor/core": "^8.5.0",
     "@capacitor/haptics": "^8.0.2",
     "@capacitor/local-notifications": "^8.3.1",
     "@capacitor/preferences": "^8.0.1",
     "@capacitor/splash-screen": "^8.0.2",
     "@capacitor/status-bar": "^8.0.3",
-    "@capacitor-community/admob": "^8.1.0",
-    "@revenuecat/purchases-capacitor": "^13.4.1",
-    "@openforge/capacitor-game-connect": "^5.0.2"
+    "@revenuecat/purchases-capacitor": "^13.4.1"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.5.0",
     "@capacitor/ios": "^8.5.0",
-    "@capacitor/assets": "^3.0.5",
     "vite": "^8.2.2"
   }
 }
