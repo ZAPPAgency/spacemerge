@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Spacemerge</string>
+    <string name="title_activity_main">Spacemerge</string>
+    <string name="package_name">com.zappstudio.spacemerge</string>
+    <string name="custom_url_scheme">com.zappstudio.spacemerge</string>
+    <!-- Google's sample App ID (test ads only). Replace with the real AdMob App ID before release. -->
+    <string name="admob_app_id">ca-app-pub-3940256099942544~3347511713</string>
+</resources>
