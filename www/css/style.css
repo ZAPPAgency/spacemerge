@@ -491,6 +491,92 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg-deep);color:var(--t
 .eggFoundCard{text-align:center;}
 .eggFoundIcon{display:block;width:64px;height:64px;object-fit:contain;margin:4px auto 8px;animation:cosmicBoxReveal .4s ease-out;}
 
+/* Big Bang transition: same vocabulary as the grand finale below (rays, falling sparkles,
+   shake) but shorter, since it replays at every Big Bang. Built by playBigBangAnimation()
+   (ui.js); --bx/--by hold the grid center everything blasts out of. */
+.bigBangFx{position:fixed;inset:0;z-index:200;overflow:hidden;}
+/* Blast frame: one hard white hit, kept brief and under full opacity. */
+.bigBangFxWhite{position:absolute;inset:0;background:#fffdf5;pointer-events:none;opacity:0;
+  animation:bigBangFxWhite .4s ease-out forwards;}
+@keyframes bigBangFxWhite{0%{opacity:0;}8%{opacity:.88;}100%{opacity:0;}}
+.bigBangFxCore{position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(circle at var(--bx,50%) var(--by,50%),
+    rgba(255,247,227,1),rgba(244,114,224,.72) 24%,rgba(3,2,10,.95) 60%);
+  animation:bigBangFxCore 1.5s ease-out forwards;}
+/* Opaque around BIG_BANG_FX_RESET_MS (ui.js): the grid swap must happen behind the flash. */
+@keyframes bigBangFxCore{0%{opacity:0;}10%{opacity:1;}62%{opacity:1;}100%{opacity:0;}}
+.bigBangFxBurst{position:absolute;left:var(--bx,50%);top:var(--by,50%);width:0;height:0;pointer-events:none;}
+/* Shockwaves: same idea as .impactRing, scaled up to cross the whole screen. */
+.bigBangFxShock{position:absolute;top:-20px;left:-20px;width:40px;height:40px;border-radius:50%;
+  border:4px solid rgba(255,247,227,.95);opacity:0;transform:scale(.1);
+  box-shadow:0 0 22px 6px rgba(244,114,224,.55),inset 0 0 18px rgba(244,114,224,.5);
+  animation:bigBangFxShock .8s cubic-bezier(.16,1,.3,1) var(--shockDelay,0s) forwards;}
+@keyframes bigBangFxShock{
+  0%{transform:scale(.1);opacity:0;}
+  12%{opacity:1;}
+  100%{transform:scale(var(--shockScale,30));opacity:0;}
+}
+.bigBangFxRay{position:absolute;top:0;left:0;width:5px;height:88vmax;margin-left:-2.5px;transform-origin:top center;
+  background:linear-gradient(to bottom,#fff,#f472e0 22%,transparent 78%);
+  transform:rotate(var(--ang,0deg)) scaleY(0);opacity:0;
+  animation:bigBangFxRay 1s cubic-bezier(.16,1,.3,1) var(--rayDelay,0s) forwards;}
+.bigBangFxRay.short{height:46vmax;opacity:.75;}
+@keyframes bigBangFxRay{
+  0%{transform:rotate(var(--ang,0deg)) scaleY(0);opacity:0;}
+  20%{opacity:1;}
+  100%{transform:rotate(var(--ang,0deg)) scaleY(1);opacity:0;}
+}
+/* Shards thrown outward from the center (--dx/--dy), unlike the sparkles that just fall. */
+.bigBangFxShard{position:absolute;top:-3px;left:-3px;width:6px;height:6px;border-radius:3px;
+  background:#fff;box-shadow:0 0 12px 3px rgba(244,114,224,.85);
+  animation:bigBangFxShard .95s cubic-bezier(.12,.8,.3,1) var(--shardDelay,0s) forwards;}
+@keyframes bigBangFxShard{
+  0%{transform:translate(0,0) scale(.3);opacity:0;}
+  15%{opacity:1;}
+  100%{transform:translate(var(--dx,0),var(--dy,0)) scale(var(--shardScale,1));opacity:0;}
+}
+.bigBangFxSparkles{position:absolute;inset:0;overflow:hidden;pointer-events:none;}
+/* Reuses the finale's fall keyframes, with per-particle durations set in JS. */
+.bigBangFxSparkle{position:absolute;top:-5%;width:4px;height:4px;border-radius:50%;
+  background:#fff;box-shadow:0 0 6px 2px #f472e0aa;
+  animation:eggFinaleSparkleFall var(--fallDur,1s) linear var(--fallDelay,0s) forwards;}
+.bigBangFxHint{position:absolute;left:0;right:0;bottom:calc(var(--safe-bottom) + 26px);
+  text-align:center;font-size:12px;letter-spacing:.06em;color:#fff;
+  /* The flash behind it is white near the grid, dark further out - the shadow keeps
+     the line readable wherever the grid sits on screen. */
+  text-shadow:0 1px 6px rgba(3,2,10,.95),0 0 2px rgba(3,2,10,.8);
+  opacity:0;animation:bigBangFxHint .5s ease-out .6s forwards;}
+@keyframes bigBangFxHint{0%{opacity:0;}100%{opacity:.8;}}
+/* Much heavier than the finale's shake: a zoom punch, then a long decaying rattle.
+   The zoom is what makes the rattle safe: a translated body uncovers the screen edges
+   unless the shift stays inside the margin the zoom adds. Shifts are in % of the body
+   (i.e. of the viewport) so that margin holds at any screen size, and each keyframe
+   keeps scale >= 1 + 2 * shift + 2.5 * sin(rotation) - the last term is what the tilt
+   costs on the most elongated phone. Scale never goes under 1 for the same reason. */
+body.bigBangFxShake{animation:bigBangFxShake 1.1s cubic-bezier(.36,.07,.19,.97);}
+@keyframes bigBangFxShake{
+  0%{transform:translate(0,0) scale(1);}
+  3%{transform:translate(0,0) scale(1.09);}
+  9%{transform:translate(-1.6%,1.6%) rotate(-.4deg) scale(1.08);}
+  16%{transform:translate(1.6%,-1.5%) rotate(.4deg) scale(1.075);}
+  23%{transform:translate(-1.4%,-1.3%) rotate(-.35deg) scale(1.065);}
+  31%{transform:translate(1.2%,1.2%) rotate(.3deg) scale(1.055);}
+  40%{transform:translate(-1%,1%) rotate(-.25deg) scale(1.045);}
+  49%{transform:translate(.8%,-.8%) rotate(.2deg) scale(1.035);}
+  59%{transform:translate(-.6%,-.6%) rotate(-.15deg) scale(1.026);}
+  69%{transform:translate(.45%,.45%) rotate(.1deg) scale(1.018);}
+  79%{transform:translate(-.3%,.3%) scale(1.012);}
+  88%{transform:translate(.18%,-.18%) scale(1.007);}
+  95%{transform:translate(0,0) scale(1.002);}
+  100%{transform:translate(0,0) scale(1);}
+}
+/* Keep the burst, drop the screen movement and soften the blast frame. */
+@media (prefers-reduced-motion:reduce){
+  body.bigBangFxShake{animation:none;}
+  .bigBangFxWhite{animation-name:bigBangFxWhiteSoft;}
+  @keyframes bigBangFxWhiteSoft{0%{opacity:0;}8%{opacity:.35;}100%{opacity:0;}}
+}
+
 /* Grand finale: fullscreen, above every modal, with a staged reveal (.eggFinaleStage.revealed).
    Compound selector so it beats the later .modalOverlay base rule. */
 .modalOverlay.eggFinaleOverlay{z-index:300;background:radial-gradient(circle at 50% 40%,#1a0f3a,#020103 75%);overflow:hidden;}

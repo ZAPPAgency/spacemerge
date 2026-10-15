@@ -136,6 +136,7 @@ function requestStorageAccessBestEffort() {
   function handleAppResume() {
     if (resuming) return; // visibilitychange and focus can fire back to back
     resuming = true;
+    finishBigBangAnimation(); // its timers were throttled while hidden, so end it now
     unmuteAllAudio();
     if (Game.settings.music) MusicService.start();
     ensureDailyStats(Game.state);

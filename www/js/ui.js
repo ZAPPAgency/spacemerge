@@ -1399,6 +1399,121 @@ function openBigBangModal() {
 }
 function closeBigBangModal() { $("bigBangModal").classList.add("hidden"); }
 
+// ---------------- Big Bang transition ----------------
+// Same visual language as openEggFinaleModal(), but it plays at every Big Bang
+// instead of once per save: shorter, and skippable with a tap.
+const BIG_BANG_FX_MS = 1500;
+// When the grid is redrawn, while the flash is fully opaque - the finished run
+// stays on screen until then, and the swap to the fresh grid is never seen.
+const BIG_BANG_FX_RESET_MS = 520;
+// iOS has no continuous vibration, so the rumble under the shake is a decaying
+// burst of impacts (offsets in ms from the start of the animation). This replaces
+// the single confirmation haptic onBigBangConfirm() used to fire.
+const BIG_BANG_FX_HAPTICS_MS = [0, 120, 260, 430];
+// Set while an animation is running; see finishBigBangAnimation().
+let bigBangFxEnd = null;
+
+// `onReset` redraws the grid, which performBigBang() already emptied in the state.
+// `onDone` runs once the overlay is gone, so whatever it opens (the summary, then
+// the grand finale when the 4th secret drops with it) never overlaps this animation.
+function playBigBangAnimation(onReset, onDone) {
+  finishBigBangAnimation(); // a still-running animation would leak its timers
+  const overlay = $("bigBangFx");
+  const burstHost = $("bigBangFxBurst");
+  const sparkleHost = $("bigBangFxSparkles");
+  burstHost.innerHTML = "";
+  sparkleHost.innerHTML = "";
+
+  // Everything blasts out of the grid the player just completed, not the screen center.
+  const rect = dom.grid.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  overlay.style.setProperty("--bx", cx + "px");
+  overlay.style.setProperty("--by", cy + "px");
+  // That center sits high on a phone, so rings and shards are sized from the
+  // farthest screen corner - otherwise they stop short of the bottom edge.
+  const reach = Math.hypot(
+    Math.max(cx, window.innerWidth - cx),
+    Math.max(cy, window.innerHeight - cy),
+  );
+
+  const SHOCK_COUNT = 3;
+  // .bigBangFxShock is 40px wide, so a scale of reach/20 puts its edge on that corner.
+  const shockScale = Math.ceil((reach / 20) * 1.05);
+  for (let i = 0; i < SHOCK_COUNT; i++) {
+    const shock = el("div", "bigBangFxShock");
+    shock.style.setProperty("--shockScale", String(shockScale));
+    shock.style.setProperty("--shockDelay", (i * 0.13).toFixed(2) + "s");
+    burstHost.appendChild(shock);
+  }
+  const RAY_COUNT = 18;
+  for (let i = 0; i < RAY_COUNT; i++) {
+    const ray = el("div", "bigBangFxRay" + (i % 2 === 1 ? " short" : ""));
+    ray.style.setProperty("--ang", (i * (360 / RAY_COUNT)) + "deg");
+    // Every third ray fires late, so the star keeps growing instead of landing in one hit.
+    ray.style.setProperty("--rayDelay", (i % 3 === 0 ? "0.16s" : "0s"));
+    burstHost.appendChild(ray);
+  }
+  const SHARD_COUNT = 16;
+  for (let i = 0; i < SHARD_COUNT; i++) {
+    const shard = el("div", "bigBangFxShard");
+    const angle = (i / SHARD_COUNT) * Math.PI * 2 + Math.random() * 0.4;
+    const dist = reach * (0.55 + Math.random() * 0.5);
+    shard.style.setProperty("--dx", Math.round(Math.cos(angle) * dist) + "px");
+    shard.style.setProperty("--dy", Math.round(Math.sin(angle) * dist) + "px");
+    shard.style.setProperty("--shardScale", (0.6 + Math.random() * 0.9).toFixed(2));
+    shard.style.setProperty("--shardDelay", (Math.random() * 0.12).toFixed(2) + "s");
+    burstHost.appendChild(shard);
+  }
+  const SPARKLE_COUNT = 18;
+  for (let i = 0; i < SPARKLE_COUNT; i++) {
+    const s = el("div", "bigBangFxSparkle");
+    s.style.left = (Math.random() * 100) + "%";
+    // Durations and delays stay under BIG_BANG_FX_MS: a sparkle still falling
+    // when the overlay hides would be cut off mid-screen.
+    s.style.setProperty("--fallDur", (0.7 + Math.random() * 0.4).toFixed(2) + "s");
+    s.style.setProperty("--fallDelay", (0.2 + Math.random() * 0.2).toFixed(2) + "s");
+    s.style.setProperty("--drift", ((Math.random() - 0.5) * 60).toFixed(0) + "px");
+    sparkleHost.appendChild(s);
+  }
+
+  overlay.classList.remove("hidden");
+  document.body.classList.add("bigBangFxShake");
+  Sfx.bigBangBlast(); // layered under the bigBang() chime the caller already played
+
+  let resetDone = false;
+  const reset = () => {
+    if (resetDone) return;
+    resetDone = true;
+    onReset();
+  };
+  const skip = () => finishBigBangAnimation();
+  const timers = BIG_BANG_FX_HAPTICS_MS.map((delay, i) =>
+    setTimeout(() => HapticService.impact(i === 0 ? "heavy" : "medium"), delay),
+  );
+  timers.push(setTimeout(reset, BIG_BANG_FX_RESET_MS), setTimeout(skip, BIG_BANG_FX_MS));
+  bigBangFxEnd = () => {
+    timers.forEach(clearTimeout);
+    bigBangFxEnd = null;
+    overlay.removeEventListener("click", skip);
+    overlay.classList.add("hidden");
+    document.body.classList.remove("bigBangFxShake");
+    burstHost.innerHTML = "";
+    sparkleHost.innerHTML = "";
+    reset(); // skipping early still owes the grid its redraw
+    onDone();
+  };
+  // "click" and not "pointerdown": the tap is then consumed here instead of also
+  // landing on the summary modal that onDone opens during the same gesture.
+  overlay.addEventListener("click", skip);
+}
+
+// Ends the animation at once: tap to skip, and on resume, where throttled
+// background timers would otherwise leave the overlay stuck over the game.
+function finishBigBangAnimation() {
+  if (bigBangFxEnd) bigBangFxEnd();
+}
+
 // ---------------- Big Bang summary (shown right after confirming) ----------------
 // A toast alone flashed and vanished, with nothing recapping what the run was
 // actually worth or pointing at what's next - this replaces it with a real

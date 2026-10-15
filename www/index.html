@@ -37,7 +37,7 @@
     <meta name="apple-mobile-web-app-title" content="Spacemerge" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="theme-color" content="#0a0620" />
-    <link rel="stylesheet" href="css/style.css?v=125" />
+    <link rel="stylesheet" href="css/style.css?v=126" />
   </head>
   <body>
     <div id="starsBg"></div>
@@ -315,6 +315,16 @@
           <button class="btn primary" id="bigBangConfirm">Confirmer</button>
         </div>
       </div>
+    </div>
+
+    <!-- Big Bang transition: rays and sparkles built by playBigBangAnimation() (ui.js).
+         Covers the screen so a tap anywhere skips it instead of reaching the grid. -->
+    <div class="bigBangFx hidden" id="bigBangFx">
+      <div class="bigBangFxCore"></div>
+      <div class="bigBangFxWhite"></div>
+      <div class="bigBangFxBurst" id="bigBangFxBurst"></div>
+      <div class="bigBangFxSparkles" id="bigBangFxSparkles"></div>
+      <div class="bigBangFxHint">Touche l'écran pour passer</div>
     </div>
 
     <!-- Big Bang summary: shown right after confirming, recaps the finished run and points at what's next -->
@@ -652,16 +662,16 @@
       </div>
     </div>
 
-    <script src="js/config.js?v=125"></script>
-    <script src="js/state.js?v=125"></script>
-    <script src="js/audio.js?v=125"></script>
-    <script src="js/services.js?v=125"></script>
-    <script src="js/economy.js?v=125"></script>
-    <script src="js/gods.js?v=125"></script>
-    <script src="js/retention.js?v=125"></script>
-    <script src="js/ui.js?v=125"></script>
-    <script src="js/input.js?v=125"></script>
-    <script src="js/main.js?v=125"></script>
+    <script src="js/config.js?v=126"></script>
+    <script src="js/state.js?v=126"></script>
+    <script src="js/audio.js?v=126"></script>
+    <script src="js/services.js?v=126"></script>
+    <script src="js/economy.js?v=126"></script>
+    <script src="js/gods.js?v=126"></script>
+    <script src="js/retention.js?v=126"></script>
+    <script src="js/ui.js?v=126"></script>
+    <script src="js/input.js?v=126"></script>
+    <script src="js/main.js?v=126"></script>
     <script type="module" src="js/native-bridge.js"></script>
     <script>
       // Debug panel: opt-in with ?debug=1. The file is never referenced by the
