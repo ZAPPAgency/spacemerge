@@ -36,7 +36,7 @@ forrestchang/andrej-karpathy-skills and drona23/claude-token-efficient.
 
 ## 3. Project
 
-Spacemerge: merge / idle / prestige space game. Vanilla HTML/CSS/JS in `www/`, shipped as a
+Galaxeed: merge / idle / prestige space game. Vanilla HTML/CSS/JS in `www/`, shipped as a
 native app via Capacitor 8 (iOS set up; Android planned, `@capacitor/android` not installed yet).
 UI text is French (`lang="fr"`), English localization is planned.
 

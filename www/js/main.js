@@ -1,4 +1,4 @@
-// Spacemerge - boot sequence & main loop
+// Galaxeed - boot sequence & main loop
 "use strict";
 
 // Asks for storage access when the game runs inside a cross-origin iframe, where

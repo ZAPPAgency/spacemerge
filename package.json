@@ -1,8 +1,8 @@
 {
-  "name": "spacemerge",
+  "name": "galaxeed",
   "version": "1.0.0",
   "private": true,
-  "description": "Spacemerge - jeu merge/idle/prestige spatial (Capacitor iOS)",
+  "description": "Galaxeed - jeu merge/idle/prestige spatial (Capacitor iOS)",
   "scripts": {
     "build": "npm run build:staging",
     "build:staging": "node scripts/copy-web.mjs && vite build --mode staging",

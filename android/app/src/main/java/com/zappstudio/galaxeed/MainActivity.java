@@ -1,4 +1,4 @@
-package com.zappstudio.spacemerge;
+package com.zappstudio.galaxeed;
 
 import com.getcapacitor.BridgeActivity;
 

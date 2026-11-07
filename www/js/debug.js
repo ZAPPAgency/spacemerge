@@ -1,4 +1,4 @@
-// Spacemerge - debug panel: paint any tile on any cell and drive Stardust
+// Galaxeed - debug panel: paint any tile on any cell and drive Stardust
 // production. Loaded only when the URL carries ?debug=1 (see index.html), never
 // in a store build: it hands out currency and rewrites the grid for free.
 "use strict";

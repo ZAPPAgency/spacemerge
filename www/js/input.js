@@ -1,4 +1,4 @@
-// Spacemerge - pointer input (drag/tap merge) + all button/action handlers
+// Galaxeed - pointer input (drag/tap merge) + all button/action handlers
 "use strict";
 
 function localPos(e) {

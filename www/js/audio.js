@@ -1,4 +1,4 @@
-// Spacemerge - synthesized audio (Web Audio API only, zero external files)
+// Galaxeed - synthesized audio (Web Audio API only, zero external files)
 "use strict";
 
 let audioCtx = null;

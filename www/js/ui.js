@@ -1,4 +1,4 @@
-// Spacemerge - all rendering: grid, header, panels, modals, toasts, tutorial
+// Galaxeed - all rendering: grid, header, panels, modals, toasts, tutorial
 "use strict";
 
 const $ = (id) => document.getElementById(id);
@@ -1298,10 +1298,10 @@ function renderSettingsPanel() {
   dom.panelBody.appendChild(priv);
 
   const support = el("a", "btn ghost full", "Contacter le support");
-  support.href = "mailto:support@spacemerge.example"; support.style.textDecoration = "none"; support.style.justifyContent = "center";
+  support.href = "mailto:support@galaxeed.example"; support.style.textDecoration = "none"; support.style.justifyContent = "center";
   dom.panelBody.appendChild(support);
 
-  dom.panelBody.appendChild(el("p", "desc", "Spacemerge — v1.0.0 (prototype)"));
+  dom.panelBody.appendChild(el("p", "desc", "Galaxeed — v1.0.0 (prototype)"));
 }
 
 // ---------------- Tutorial ----------------

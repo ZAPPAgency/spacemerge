@@ -1,4 +1,4 @@
-# Spacemerge
+# Galaxeed
 
 Jeu merge/idle/prestige spatial, prévu pour iOS via Capacitor. Ce dépôt
 contient **tout le projet** : code source, config Capacitor, assets,
@@ -11,7 +11,7 @@ Le contenu de `www/` est déployé automatiquement sur **GitHub Pages** à
 chaque `git push` sur `main`, via GitHub Actions
 (`.github/workflows/deploy.yml`) :
 
-**https://zappagency.github.io/spacemerge/**
+**https://zappagency.github.io/galaxeed/**
 
 Aucune étape manuelle : éditer les fichiers dans `www/`, commit, push
 sur `main`, et la nouvelle version est en ligne en 1-2 minutes (suivre
@@ -26,11 +26,11 @@ git push
 **Sur une branche/PR (pas `main`)** : deux autres workflows publient une
 preview séparée, sans jamais toucher à l'URL ci-dessus :
 - `.github/workflows/preview.yml` ("Deploy PR previews") - une PR ouverte
-  obtient `https://zappagency.github.io/spacemerge/pr-preview/pr-<N>/`,
+  obtient `https://zappagency.github.io/galaxeed/pr-preview/pr-<N>/`,
   mise à jour à chaque push sur la branche de la PR.
 - `.github/workflows/branch-preview.yml` ("Deploy branch previews") - toute
   autre branche poussée (sans PR ouverte dessus) obtient
-  `https://zappagency.github.io/spacemerge/branch-preview/<nom-de-branche>/`.
+  `https://zappagency.github.io/galaxeed/branch-preview/<nom-de-branche>/`.
 
 Une workflow GitHub Actions est nécessaire (plutôt que le déploiement
 "classique" par branche) car `www/` est un sous-dossier — le build
@@ -47,9 +47,8 @@ build Capacitor/iOS fonctionne (voir `vite.config.js`, `root: "www"`).
   (confidentialité, classification d'âge). **Commencer par
   `docs/BUILD_IOS.md`** pour le build natif.
 - `capacitor.config.ts` / `package.json` — config du projet Capacitor.
-  L'`appId` dans `capacitor.config.ts` est encore un placeholder
-  (`com.example.spacemerge`) à remplacer par le vrai identifiant une fois
-  l'App ID créé dans App Store Connect.
+  L'`appId` de `capacitor.config.ts` (`com.zappstudio.galaxeed`) doit
+  correspondre à l'App ID créé dans App Store Connect.
 - `assets/` — icône source (1024×1024), jeu d'icônes iOS déjà généré (à
   refaire, voir `docs/QA_CHECKLIST.md`), captures d'écran (à refaire
   aussi, elles datent d'avant plusieurs refontes de l'UI).

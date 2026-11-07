@@ -1,4 +1,4 @@
-// Spacemerge - Gods of the Cosmos: unlock conditions, equipped-god effects,
+// Galaxeed - Gods of the Cosmos: unlock conditions, equipped-god effects,
 // the "choose your first god" ritual, and challenge tracking.
 //
 // One god is equipped per run (state.gods.currentGodId). Its `effects` are

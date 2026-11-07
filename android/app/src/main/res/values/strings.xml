@@ -1,9 +1,9 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Spacemerge</string>
-    <string name="title_activity_main">Spacemerge</string>
-    <string name="package_name">com.zappstudio.spacemerge</string>
-    <string name="custom_url_scheme">com.zappstudio.spacemerge</string>
-    <!-- Spacemerge Android App ID from the AdMob console (App settings). -->
+    <string name="app_name">Galaxeed</string>
+    <string name="title_activity_main">Galaxeed</string>
+    <string name="package_name">com.zappstudio.galaxeed</string>
+    <string name="custom_url_scheme">com.zappstudio.galaxeed</string>
+    <!-- Galaxeed Android App ID from the AdMob console (App settings). -->
     <string name="admob_app_id">ca-app-pub-2677771131000988~1823748287</string>
 </resources>

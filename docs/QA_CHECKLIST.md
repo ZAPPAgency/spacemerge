@@ -1,4 +1,4 @@
-# Spacemerge — Checklist QA avant soumission
+# Galaxeed — Checklist QA avant soumission
 
 Légende : ✅ validé dans cet environnement (web) · 🔶 partiellement validé,
 vérification native recommandée · ⬜ à valider par toi sur device/Xcode réel

@@ -1,4 +1,4 @@
-// Spacemerge - game state: defaults, load/save, migrations, daily helpers
+// Galaxeed - game state: defaults, load/save, migrations, daily helpers
 "use strict";
 
 function todayStr(d) {

@@ -1,7 +1,7 @@
-# Spacemerge — Plan de lancement iOS + Android
+# Galaxeed — Plan de lancement iOS + Android
 
 **Rédigé le :** 2026-09-27, à partir de `main` @ `5043983` et de tous les fichiers de `docs/`.
-**Avancement mis à jour le :** 2026-11-01 (cases du §4 et du §7).
+**Avancement mis à jour le :** 2026-11-07 (cases du §4 et du §7).
 **Pour :** Moi (dev, code, build) et le Collègue (UI/UX, assets, marketing).
 
 **Légende**
@@ -66,7 +66,7 @@ Relevé le 2026-09-27 sur `main` @ `5043983`. L'audit (`docs/AUDIT_AND_ROADMAP.m
 | **P3** `appId` | À faire | `capacitor.config.ts:6` : `com.example.spacemerge`. | CPT-02, AND-01 |
 | **P3** Cache-buster manuel | Partiel | Toujours manuel (`?v=125`, `index.html:40` et `:655-664`), mais le process est documenté dans `CLAUDE.md`. Aucun effet sur le natif. | À garder |
 | **P3** `nebula-merge` | À faire | `docs/BUILD_IOS.md:22`. | STR-07 |
-| **P3** Remote `origin` | Fait | `.git/config` : `git@github.com:ZAPPAgency/spacemerge.git`. | — |
+| **P3** Remote `origin` | Fait | `.git/config` : `git@github.com:ZAPPAgency/galaxeed.git`. | — |
 | **P3** Reporting d'erreurs | À faire | Aucun SDK de reporting. | OBS-01 (D10) |
 | **S-0** Ordre des scripts | Partiel | Documenté dans `CLAUDE.md` §3, pas dans `index.html:655-665`. | STR-02 |
 | **S-1** Point d'entrée unique | Partiel | Fait : `native-bridge.js` est chargé en permanence (`index.html:665`). Reste : les fichiers web-only ne sont pas exclus, il n'y a pas de garde-fou, et le build est cassé et incomplet (N-01, N-02). `BUILD_IOS.md` §3 (l.31-49) décrit encore l'ancien fonctionnement. | STR-01 à STR-03 |
@@ -85,7 +85,7 @@ Relevé le 2026-09-27 sur `main` @ `5043983`. L'audit (`docs/AUDIT_AND_ROADMAP.m
 | N-05 | Notifications : permission demandée au boot, toggle ignoré, vouvoiement. | Permission au boot : `native-bridge.js:142`. Le toggle « Notifications » (`ui.js:1253`) n'est jamais lu par `native-bridge.js:143-162`, il ne fait donc rien. Les textes vouvoient alors que le jeu tutoie. | FND-05 |
 | N-06 | `@capacitor/app` est installé mais jamais importé : pas d'`appStateChange`, pas de bouton retour Android. | `grep -rn "@capacitor/app" www/js` vide. | FND-04 |
 | N-07 | La récompense rewarded dépend de la simple résolution de la promesse (`return !!result`), alors que `CLAUDE.md` exige la confirmation du SDK. | `native-bridge.js:82`. ⚠️ Comportement du plugin en cas de fermeture anticipée non vérifié. | ADS-03 |
-| N-08 | « Spacemerge — v1.0.0 (prototype) » est visible dans les Réglages : risque Guideline 2.2 (démo, bêta), et la version est codée en dur. | `ui.js:1304`. | FND-07 |
+| N-08 | « Galaxeed — v1.0.0 (prototype) » est visible dans les Réglages : risque Guideline 2.2 (démo, bêta), et la version est codée en dur. | `ui.js:1304`. | FND-07 |
 | N-09 | Lien confidentialité relatif et e-mail de support placeholder. | `ui.js:1296-1302`. | FND-07 |
 | N-10 | `starter_pack` est déclaré `nonconsumable` alors qu'il donne des Gems (consommables) : sa restauration serait ambiguë. | `config.js:1144-1145`. | IAP-01 (D8) |
 | N-11 | Probabilités de la Boîte Cosmique inexactes dès qu'une rareté est complète. `rollCosmicBox` re-tire la rareté, donc les probabilités réelles sont renormalisées. Une fois tous les Dieux obtenus, la boîte donne 10 à 200 Gems selon une loi au carré, sans probabilités affichées. | `gods.js:207-216`, `gods.js:222-226`, texte fixe `config.js:1102`. | CMP-02 |
@@ -108,8 +108,8 @@ Relevé le 2026-09-27 sur `main` @ `5043983`. L'audit (`docs/AUDIT_AND_ROADMAP.m
 | I-04 | Le « résumé V1 » d'App Privacy ne garde que Achats et Game Center, ce qui est **faux**. Le SDK Google Mobile Ads collecte ID d'appareil, adresse IP (localisation approximative), interactions produit, données publicitaires et diagnostics, même en mode non personnalisé (page Google « App store data disclosure »). Game Center sort de la V1. | `APP_PRIVACY_ANSWERS.md:42-47` | Réécrire à partir des pages Google, RevenueCat et Sentry. | CMP-05, CMP-07 |
 | I-05 | La bannière est citée comme format AdMob dans la politique et dans `AGE_RATING_ANSWERS.md:20`. | politique, âge | La retirer (D2). | CMP-01, CMP-07 |
 | I-06 | La politique ne parle que d'iOS (« Réglages iOS », « contrôles parentaux natifs d'iOS »). Il manquent : Android et Google Play, UMP, droits RGPD/nLPD, durée de conservation. Game Center y est encore listé. | politique | Réécriture valable pour les deux plateformes. | CMP-01 |
-| I-07 | E-mail de support placeholder `support@spacemerge.example`. | politique, `ui.js:1301` | Créer une vraie adresse. | CPT-08, FND-07 |
-| I-08 | Le nom du projet varie : `cd nebula-merge` (`BUILD_IOS.md:22`), Godspark et Cosmerge (audit l.861-990), `SAVE_KEY = "cosmerge_save_v2"` (`config.js:7`). | docs, code | Fixer « Spacemerge » dans les docs. **Ne jamais changer `SAVE_KEY`** (invariant de `CLAUDE.md`), mais le signaler comme nom historique dans `BUILD_*.md`. | STR-07 |
+| I-07 | E-mail de support placeholder `support@galaxeed.example`. | politique, `ui.js:1301` | Créer une vraie adresse. | CPT-08, FND-07 |
+| I-08 | Le nom du projet varie : `cd nebula-merge` (`BUILD_IOS.md:22`), Godspark et Cosmerge (audit l.861-990), `SAVE_KEY = "cosmerge_save_v2"` (`config.js:7`). | docs, code | Fixer « Galaxeed » dans les docs. **Ne jamais changer `SAVE_KEY`** (invariant de `CLAUDE.md`), mais le signaler comme nom historique dans `BUILD_*.md`. | STR-07 |
 | I-09 | `appId` placeholder, que le README (l.48-51) signale lui aussi. | `capacitor.config.ts:6` | Choisir l'identifiant final (CPT-02). | CPT-02 |
 | I-10 | `BUILD_IOS.md` est obsolète sur cinq points : le §3 dit que `native-bridge.js` n'est pas chargé (faux depuis `index.html:665`), le §9 renvoie vers `docs/APP_STORE_ASSETS.md` qui n'existe pas (l.130), il demande Node ≥ 18 (Capacitor 8 exige ≥ 22), il décrit CocoaPods (Capacitor 8 crée des projets SPM), et il inclut Game Center et ATT. | `BUILD_IOS.md` | Réécrire après IOS-07, avec les commandes réellement utilisées. | STR-07 |
 | I-11 | `QA_CHECKLIST` coche plusieurs points faux ou obsolètes : « Restaurer les achats ✅ » (l.50-53, faux sur natif), « la bannière reste masquée » (l.54-57), « Fusion Express » (l.43, n'existe plus : grep vide), « Politique cohérente ✅ » (l.68-70, faux, voir I-03 et I-04). | `QA_CHECKLIST.md` | Refaire en deux colonnes, iOS et Android. | CMP-07 |
@@ -128,8 +128,8 @@ Relevé le 2026-09-27 sur `main` @ `5043983`. L'audit (`docs/AUDIT_AND_ROADMAP.m
 
 ### Hypothèses retenues et réponses reçues
 
-- **H-1** Le nom final est **« Spacemerge »** (branche `chore/rename_spacemerge`, `package.json`, README). Recherche d'homonymes et de marques : en attente (CPT-02).
-- **H-2 · Décidé le 2026-09-30.** L'identifiant iOS et Android est **`com.zappstudio.spacemerge`** (même `appId` Capacitor pour les deux). **Irréversible** une fois publié. Libre sur Google Play (404 vérifié le 2026-09-30).
+- **H-1 · Décidé le 2026-11-07.** Le nom final est **« Galaxeed »**, à la place de Spacemerge. Aucune app de ce nom sur l'App Store ni sur Google Play (vérifié le 2026-11-07). `galaxeed.com` est pris. Recherche de marques : en attente (CPT-02).
+- **H-2 · Décidé le 2026-11-07.** L'identifiant iOS et Android est **`com.zappstudio.galaxeed`** (même `appId` Capacitor pour les deux), à la place de `com.zappstudio.spacemerge`. **Irréversible** une fois publié. Libre sur Google Play (404 vérifié le 2026-11-07).
 - **H-3 · Confirmé le 2026-09-30.** Comptes personnels : Apple « Individual » (pas de D-U-N-S) et ton compte Google perso, **créé en 2026**. Le test fermé (12 testeurs pendant 14 jours) est donc **obligatoire** : DST-01 à DST-03 restent sur le chemin critique.
 - **H-4 · Confirmé le 2026-09-30.** Le Collègue a un iPhone : il sert pour IOS-02, TestFlight et la QA iOS.
 - **H-5** Temps disponible : 8 h/semaine pour toi, environ 4 h/semaine pour le Collègue.
@@ -224,7 +224,7 @@ Relevé le 2026-09-27 sur `main` @ `5043983`. L'audit (`docs/AUDIT_AND_ROADMAP.m
 ### D9. Nom, identifiants, type de compte
 
 - **Recommandation.**
-  - Nom et identifiant : **Spacemerge** et **`com.zappstudio.spacemerge`** (H-1, H-2).
+  - Nom et identifiant : **Galaxeed** et **`com.zappstudio.galaxeed`** (H-1, H-2).
   - Comptes personnels (H-3). Conséquences :
     - Apple affiche ton nom légal comme vendeur.
     - Chez Google, la règle des 12 testeurs pendant 14 jours s'applique.
@@ -269,11 +269,12 @@ Format de chaque todo : responsable, plateforme, estimation et dépendances, pui
   - Pourquoi : l'identifiant ne se change plus après publication. Il conditionne `cap add`, l'App ID Apple, le package Android, AdMob et RevenueCat (P3 `appId`, D9).
   - Fichiers : `docs/LAUNCH_PLAN.md` (§3), `capacitor.config.ts`
   - Étapes :
-    1. Collègue : chercher « Spacemerge » sur l'App Store, Google Play et dans une base de marques (EUIPO eSearch, Swissreg ou INPI), puis noter les homonymes.
-    2. ~~Vérifier que `https://play.google.com/store/apps/details?id=com.zappstudio.spacemerge` renvoie bien 404.~~ Fait le 2026-09-30.
+    1. Collègue : chercher « Galaxeed » sur l'App Store, Google Play et dans une base de marques (EUIPO eSearch, Swissreg ou INPI), puis noter les homonymes.
+    2. ~~Vérifier que `https://play.google.com/store/apps/details?id=com.zappstudio.galaxeed` renvoie bien 404.~~ Fait le 2026-11-07.
     3. Trancher trader ou non-trader, et l'adresse publique (D9).
     4. ~~Remplacer « Hypothèse » par « Décidé le … » dans le §3.~~ Fait pour H-2 à H-4 et H-6 ; ajouter le statut DSA une fois tranché.
     5. ~~Mettre l'`appId` final à `capacitor.config.ts:6`~~ Fait (`e93ec95`). **Reste à faire :** supprimer le commentaire des lignes 3-4, devenu faux.
+    6. **Reste à faire :** renommer en Galaxeed ce qui vit hors du dépôt : dépôt GitHub (`ZAPPAgency/galaxeed`), 2 apps AdMob, projet RevenueCat.
   - Fait quand : le §3 est à jour et `grep -n "com.example" capacitor.config.ts` ne renvoie rien.
 
 - [ ] **CPT-03 · S'inscrire à l'Apple Developer Program (individuel)** ⏳
@@ -290,7 +291,7 @@ Format de chaque todo : responsable, plateforme, estimation et dépendances, pui
   - Pourquoi : l'app doit exister avant le test fermé, et un profil marchand est requis pour créer des produits in-app.
   - Étapes :
     1. Tableau de bord du compte : vérifier identité, téléphone et appareil. Noter si la carte « tests requis avant production » apparaît (confirme H-3).
-    2. Créer l'app : « Spacemerge », langue par défaut français (France), Jeu, Gratuite.
+    2. Créer l'app : « Galaxeed », langue par défaut français (France), Jeu, Gratuite.
     3. Paramètres → Profil de paiement : créer le profil marchand (IBAN, fiscalité).
     4. ⚠️ Remplir la déclaration de statut « trader » (DSA) si Play Console la demande.
   - Fait quand : l'app est listée, et Monétisation → Produits est accessible sans bandeau « profil marchand ».
@@ -303,7 +304,7 @@ Format de chaque todo : responsable, plateforme, estimation et dépendances, pui
 
 - [x] **CPT-06 · Créer le compte RevenueCat**
   - Moi · Les deux · **0,5 h** · Dépend de : —
-  - Étapes : app.revenuecat.com → projet « Spacemerge ». ⚠️ Vérifier le plafond de revenu du palier gratuit sur revenuecat.com/pricing.
+  - Étapes : app.revenuecat.com → projet créé sous le nom « Spacemerge », à renommer (CPT-02). ⚠️ Vérifier le plafond de revenu du palier gratuit sur revenuecat.com/pricing.
   - Fait quand : le projet est visible.
 
 - [ ] **CPT-07 · App Store Connect : accords, fiscalité, banque, fiche app** ⏳
@@ -312,7 +313,7 @@ Format de chaque todo : responsable, plateforme, estimation et dépendances, pui
   - Étapes :
     1. Business : accepter le Paid Apps Agreement, puis renseigner banque, formulaire fiscal (W-8BEN si tu n'es pas résident US) et contacts.
     2. Certificates, IDs & Profiles → Identifiers : créer l'App ID explicite (CPT-02), sans Game Center.
-    3. Apps → + : « Spacemerge », langue principale français, SKU `spacemerge-ios`.
+    3. Apps → + : « Galaxeed », langue principale français, SKU `galaxeed-ios`.
     4. S'inscrire au **Small Business Program** (commission de 15 %).
     5. Business → statut DSA selon D9.
   - Fait quand : Paid Apps apparaît « Active » et la fiche app existe.
@@ -409,7 +410,7 @@ Format de chaque todo : responsable, plateforme, estimation et dépendances, pui
   - Fichiers : `game.html`, `game-full.html`, `assets/ios-icons/`, `README.md`, `docs/BUILD_IOS.md`, nouveau `docs/BUILD_ANDROID.md`, `docs/SAVE_BACKUP.md`, `package.json`
   - Étapes :
     1. Vérifier que rien ne les référence : `grep -rn "game-full\|game.html\|ios-icons" --exclude-dir=node_modules .`. Puis `git rm game.html game-full.html` et `git rm -r assets/ios-icons`.
-    2. `BUILD_IOS.md` : retirer le §3, `nebula-merge`, Game Center et ATT ; indiquer Node ≥ 22, SPM, et noter que `SAVE_KEY` garde son nom historique.
+    2. `BUILD_IOS.md` : retirer le §3, Game Center et ATT ; indiquer Node ≥ 22, SPM, et noter que `SAVE_KEY` garde son nom historique.
     3. `BUILD_ANDROID.md` : JDK 21, keystore, AAB, Play App Signing, license testers, permissions relevées en AND-03.
     4. README et description de `package.json` : iOS + Android, lien vers ce plan.
     5. Ajouter en tête de l'audit et de `SAVE_BACKUP.md` : « Document historique, voir LAUNCH_PLAN.md ».
@@ -552,7 +553,7 @@ Format de chaque todo : responsable, plateforme, estimation et dépendances, pui
   - Pourquoi : sans clé d'upload, pas de mise à jour possible. Avec Play App Signing, Google garde la clé de signature et une clé d'upload perdue peut être réinitialisée par le support.
   - Fichiers : `android/keystore.properties` (gitignoré), `android/app/build.gradle`
   - Étapes :
-    1. `keytool -genkeypair -v -keystore ~/secure/spacemerge-upload.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000`.
+    1. `keytool -genkeypair -v -keystore ~/secure/galaxeed-upload.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000`.
     2. Ranger le `.jks` et les mots de passe dans un gestionnaire de mots de passe, **plus** une 2e copie chiffrée hors du Mac. Jamais dans git.
     3. Dans `build.gradle`, faire lire `keystore.properties` par `signingConfigs.release`.
     4. ⚠️ À l'upload (AND-06), vérifier que Play App Signing est actif.
@@ -576,7 +577,7 @@ Format de chaque todo : responsable, plateforme, estimation et dépendances, pui
   - Moi · Les deux · **1,5 h** · Dépend de : CPT-05, CPT-02
   - Fichiers : `.env.production`, `android/app/src/main/AndroidManifest.xml`
   - Étapes :
-    1. ~~Créer 2 apps « Spacemerge » (Android et iOS), marquées « non publiée ».~~ Fait le 2026-11-01.
+    1. ~~Créer 2 apps « Spacemerge » (Android et iOS), marquées « non publiée ».~~ Fait le 2026-11-01. À renommer (CPT-02).
     2. **Reste à faire :** pour chacune, créer un bloc Récompense `rewarded_main` et un bloc Interstitiel `interstitial_bigbang`.
     3. Confidentialité et messages → « Réglementations européennes » : un message en français pour les 2 apps, avec « Gérer les options » et le lien vers la politique.
     4. Reporter les IDs dans `.env.production`, et ~~l'App ID Android dans le manifest (l'App ID iOS se fait en IOS-03)~~. App ID Android fait dans `strings.xml` (`76074d4`), App ID iOS fait dans `Info.plist`, le 2026-11-01.
@@ -620,7 +621,7 @@ Format de chaque todo : responsable, plateforme, estimation et dépendances, pui
 
 - [ ] **ADS-06 · Publier le site racine et `app-ads.txt`**
   - Moi · Web · **1,5 h** · Dépend de : MKT-01, ADS-01
-  - Pourquoi : AdMob exige la vérification `app-ads.txt` pour les nouvelles apps (depuis janvier 2025) avant la revue « app readiness ». Le fichier doit être à la **racine** du domaine indiqué comme site du développeur dans les fiches store ; `…github.io/spacemerge/` est un sous-chemin, donc ne suffit pas ⚠️.
+  - Pourquoi : AdMob exige la vérification `app-ads.txt` pour les nouvelles apps (depuis janvier 2025) avant la revue « app readiness ». Le fichier doit être à la **racine** du domaine indiqué comme site du développeur dans les fiches store ; `…github.io/galaxeed/` est un sous-chemin, donc ne suffit pas ⚠️.
   - Fichiers : nouveau dépôt `ZAPPAgency/zappagency.github.io`
   - Étapes :
     1. Créer ce dépôt, y mettre la landing (MKT-01) et `app-ads.txt`, avec la ligne fournie par AdMob → Apps → app-ads.txt.
@@ -666,7 +667,7 @@ Format de chaque todo : responsable, plateforme, estimation et dépendances, pui
     3. Ajouter bases légales, durée de conservation, droits (suppression via l'e-mail support), autorité de contrôle (CNIL ou PFPDT ⚠️ selon H-7), contact et date.
     4. Retirer ATT, bannière et Game Center.
     5. ⚠️ Ceci n'est pas un avis juridique : faire relire si possible.
-  - Fait quand : `https://zappagency.github.io/spacemerge/privacy.html` sert la nouvelle version, et chaque SDK de `package.json` y est cité.
+  - Fait quand : `https://zappagency.github.io/galaxeed/privacy.html` sert la nouvelle version, et chaque SDK de `package.json` y est cité.
 
 - [ ] **CMP-02 · Rendre exactes les probabilités de la Boîte Cosmique**
   - Moi · Les deux · **2 h** · Dépend de : —
@@ -917,7 +918,7 @@ Format de chaque todo : responsable, plateforme, estimation et dépendances, pui
     3. Monnaie virtuelle sans valeur réelle, probabilités de la Boîte, contact, droit applicable ⚠️.
     4. Renvoi vers l'EULA standard d'Apple pour iOS.
     5. ⚠️ Ceci n'est pas un avis juridique.
-  - Fait quand : `https://zappagency.github.io/spacemerge/terms.html` répond.
+  - Fait quand : `https://zappagency.github.io/galaxeed/terms.html` répond.
 
 - [ ] **IAP-11 · Tester Google Play Billing avec des testeurs de licence**
   - Moi · Android · **3 h** · Dépend de : IAP-05 à IAP-10
@@ -947,7 +948,7 @@ Format de chaque todo : responsable, plateforme, estimation et dépendances, pui
 
 **Critère de sortie :** le build est installé sur un iPhone réel via TestFlight, et le rapport de confidentialité Xcode est généré.
 
-- [ ] **IOS-01 · Ajouter la plateforme iOS (SPM) et lancer sur simulateur**
+- [x] **IOS-01 · Ajouter la plateforme iOS (SPM) et lancer sur simulateur**
   - Moi · iOS · **2,5 h** · Dépend de : STR-02, STR-04, CPT-01, CPT-02, ADS-01
   - Fichiers : `ios/`, `package.json`
   - Étapes :
@@ -957,7 +958,7 @@ Format de chaque todo : responsable, plateforme, estimation et dépendances, pui
     4. Run sur simulateur, console via Safari → Développement → Simulateur.
     5. Committer.
   - Fait quand : le jeu tourne sur simulateur, les pubs de test s'affichent et la sauvegarde survit à un kill.
-  - **Partiel (2026-11-01) :** étapes 1 à 5 faites (#24). Le jeu tourne sur simulateur, et la sauvegarde survit à une réinstallation (un seul modal hors-ligne, pas de tutoriel). **Reste à faire :** vérifier les pubs de test.
+  - Fait le 2026-11-07 (étapes 1 à 5 dans #24). Le jeu tourne sur simulateur, la sauvegarde survit à une réinstallation (un seul modal hors-ligne, pas de tutoriel), et les pubs de test s'affichent sur iOS et sur Android.
   - Xcode 27 : `npx cap run ios` échoue, car `native-run` ouvre `Simulator.app`, remplacé par `DeviceHub.app`. Lancer depuis Xcode (▶).
 
 - [ ] **IOS-02 · Signature, capacités et lancement sur iPhone réel**
@@ -974,7 +975,7 @@ Format de chaque todo : responsable, plateforme, estimation et dépendances, pui
   - Étapes :
     1. ~~`GADApplicationIdentifier` : l'App ID iOS réel.~~ Fait le 2026-11-01.
     2. `SKAdNetworkItems` : copier la liste officielle ⚠️ (doc AdMob iOS « Update your Info.plist »).
-    3. `ITSAppUsesNonExemptEncryption` = NO, ~~`CFBundleDisplayName` = Spacemerge~~ (déjà mis par le template).
+    3. `ITSAppUsesNonExemptEncryption` = NO, ~~`CFBundleDisplayName` = Galaxeed~~ (déjà mis par le template).
     4. Portrait uniquement ; `TARGETED_DEVICE_FAMILY` = 1, iPhone seul (N-15).
     5. Pas de `NSUserTrackingUsageDescription` (D3). Version 1.0.0, build 1.
   - Fait quand : aucun avertissement AdMob au lancement, et Archive → Validate App passe.
@@ -1017,7 +1018,7 @@ Format de chaque todo : responsable, plateforme, estimation et dépendances, pui
   - Moi · Android · **1,5 h** · Dépend de : AND-06, AND-04, CMP-03, CMP-04, AST-02 à AST-04, AST-06, MKT-02
   - Pourquoi : un compte perso créé après le 13/11/2023 doit avoir **au moins 12 testeurs inscrits en continu pendant au moins 14 jours** avant de demander l'accès production (règle confirmée en 2026, voir annexe C).
   - Étapes :
-    1. Créer un Google Group « spacemerge-testeurs » et y inscrire **au moins 20** adresses (marge sur 12).
+    1. Créer un Google Group « galaxeed-testeurs » et y inscrire **au moins 20** adresses (marge sur 12).
     2. Test fermé → piste Alpha : pays des testeurs, testeurs = le Google Group, release = dernier AAB staging.
     3. Remplir la fiche principale (AST) : elle est requise pour publier la piste ⚠️.
     4. Envoyer le lien d'inscription (MKT-05).
@@ -1214,7 +1215,7 @@ Tant que le test fermé démarre au plus tard en S6, les 14 jours s'écoulent pe
 Environ 6,5 h au total : trois todos ce soir (2,5 h), STR-01 dès que tu as un créneau, STR-02 ce week-end.
 
 1. [x] **CPT-01 · Accepter la licence Xcode et vérifier la chaîne d'outils** (0,5 h). Débloque `git` et `pod`, sans quoi rien ne se committe proprement.
-2. [ ] **CPT-02 · Figer le nom, l'identifiant d'app et le statut DSA** (1 h). Identifiant décidé (`com.zappstudio.spacemerge`). Restent la recherche de nom par le Collègue et le statut DSA.
+2. [ ] **CPT-02 · Figer le nom, l'identifiant d'app et le statut DSA** (1 h). Identifiant décidé (`com.zappstudio.galaxeed`). Restent la recherche de nom par le Collègue et le statut DSA.
 3. [ ] **CPT-03 · S'inscrire à l'Apple Developer Program** (1 h). Le plus long délai externe du plan : à lancer ce soir, même si iOS arrive en S14.
 4. [x] **STR-01 · Réparer `npm run build` en retirant le plugin Game Center** (1 h). Premier maillon ★ ; le build ne passe pas aujourd'hui.
 5. [x] **STR-02 · Produire un `dist-www/` complet** (3 h). Sans ça, aucune app native ne peut afficher le jeu.

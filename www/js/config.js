@@ -1,4 +1,4 @@
-// Spacemerge - configuration & pure formulas (no state, no DOM)
+// Galaxeed - configuration & pure formulas (no state, no DOM)
 "use strict";
 
 const COLS = 6,
@@ -1124,7 +1124,7 @@ const IAP_CATALOG = [
     type: "subscription",
     name: "Pass Supernova",
     price: "5,99 $/mois",
-    desc: "L'expérience Spacemerge, sans limites.",
+    desc: "L'expérience Galaxeed, sans limites.",
     perks: [
       "Aucune publicité tant que le Pass est actif",
       "Production de Stardust doublée",

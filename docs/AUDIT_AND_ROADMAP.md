@@ -1,4 +1,4 @@
-# Spacemerge — Audit & Roadmap to Publication
+# Galaxeed — Audit & Roadmap to Publication
 
 **Date:** 2026-08-26
 **Scope:** full repo audit (source, config, docs) against App Store Review

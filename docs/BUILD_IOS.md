@@ -1,4 +1,4 @@
-# Spacemerge — Build iOS (Capacitor)
+# Galaxeed — Build iOS (Capacitor)
 
 Ce document a été préparé sans pouvoir être exécuté ni vérifié dans cet
 environnement : il n'a ni Node.js, ni Xcode complet, ni CocoaPods, ni
@@ -19,14 +19,14 @@ Toute cette étape doit donc être effectuée sur ta machine.
 ## 1. Installer les dépendances
 
 ```bash
-cd nebula-merge
+cd galaxeed
 npm install
 ```
 
 ## 2. Choisis ton bundle ID
 
-Édite `capacitor.config.ts` : remplace `com.example.spacemerge` par ton
-identifiant réel (doit correspondre à l'App ID créé dans App Store Connect).
+L'identifiant est `com.zappstudio.galaxeed` (`capacitor.config.ts`). Il doit
+correspondre à l'App ID créé dans App Store Connect.
 
 ## 3. Active le pont natif (Ads / IAP / Game Center / Haptics / Preferences)
 
